@@ -43,7 +43,7 @@ La solución es un **bridge en software** que:
 | Runtime | .NET 8 LTS | Soporte largo, mejor performance que .NET Framework |
 | Target Framework | `net8.0-windows` | Acceso a Win32 APIs sin esfuerzo |
 | UI Toolkit | WinForms (`NotifyIcon`, Forms) | Path más simple para tray apps; WPF requeriría wrappers |
-| Configuración | `Microsoft.Extensions.Configuration` + `IOptionsMonitor<T>` | Hot-reload de config sin reiniciar la app |
+| Configuración | `Microsoft.Extensions.Configuration.Ini` + `IOptionsMonitor<T>` | Formato INI legible, hot-reload sin reiniciar |
 | Host | `Microsoft.Extensions.Hosting` (Generic Host) | DI, lifetime management, IHostedService |
 | Logging | Serilog (sink: File con rolling diario) | Logs estructurados, rotación nativa |
 | Tests | xUnit + FluentAssertions | Estándar del ecosistema |
@@ -93,53 +93,67 @@ La solución es un **bridge en software** que:
 
 ### Ubicación
 
-`%LOCALAPPDATA%\AutolumoBarcodeScannerTool\appsettings.json`
+`%LOCALAPPDATA%\AutolumoBarcodeScannerTool\appsettings.ini`
 
 (El instalador crea el archivo con valores por defecto si no existe en el primer arranque.)
 
+### Formato
+
+INI estándar leído con `Microsoft.Extensions.Configuration.Ini`. Las secciones jerárquicas usan `:` como separador (convención del provider), de forma que `[Scanner:Serial]` + `PortName=COM3` se enlaza a `ScannerOptions.Serial.PortName` vía `Bind()`.
+
+Convenciones:
+
+- Valores vacíos (`Clave=`) se interpretan como `null` para tipos referencia / `default` para valores. Útil para campos opcionales como `WindowTitleContains`.
+- Comentarios con `;` al inicio de la línea (estándar INI).
+- Booleanos como `true`/`false` (case-insensitive).
+- No se permiten arrays en INI — si en el futuro hace falta una lista (ej. múltiples transforms), se modela como claves indexadas `Transforms:0:Type=...` / `Transforms:1:Type=...`.
+
 ### Esquema
 
-```jsonc
-{
-  "Scanner": {
-    "Enabled": true,
-    "SourceType": "Serial",            // "Serial" | "HidKeyboard"
-    "Terminator": "CRLF",              // "CR" | "LF" | "CRLF" | "Any"
+```ini
+; AutolumoBarcodeScannerTool - configuración
+; %LOCALAPPDATA%\AutolumoBarcodeScannerTool\appsettings.ini
 
-    "Serial": {
-      "PortName": "COM3",
-      "BaudRate": 9600,
-      "DataBits": 8,
-      "Parity": "None",                // "None" | "Even" | "Odd" | "Mark" | "Space"
-      "StopBits": "One",               // "One" | "OnePointFive" | "Two"
-      "Encoding": "ASCII"              // "ASCII" | "UTF8" | "Latin1"
-    },
-    "HidKeyboard": {
-      "VendorId": "0x05E0",            // hex string
-      "ProductId": "0x1300"
-    },
+[Scanner]
+Enabled=true
+SourceType=Serial                ; Serial | HidKeyboard
+Terminator=CRLF                  ; CR | LF | CRLF | Any
 
-    "Target": {
-      "ProcessName": "MiAppContable",  // sin .exe
-      "WindowTitleContains": null      // opcional, null = solo proceso
-    },
+[Scanner:Serial]
+PortName=COM3
+BaudRate=9600
+DataBits=8
+Parity=None                      ; None | Even | Odd | Mark | Space
+StopBits=One                     ; One | OnePointFive | Two
+Encoding=ASCII                   ; ASCII | UTF8 | Latin1
 
-    "Output": {
-      "OnTerminator": "Tab",           // "Tab" | "TabEnter" | "TabOnly" | "Custom"
-      "OutputSuffix": "{TAB}"          // tokens: {TAB} {ENTER} — usado si OnTerminator=Custom
-    }
-  },
-  "Autostart": true,
-  "Logging": {
-    "MinimumLevel": "Information",     // Verbose | Debug | Information | Warning | Error
-    "LogPayload": true                 // false en entornos con datos sensibles
-  }
-}
+[Scanner:HidKeyboard]
+VendorId=0x05E0                  ; hex string
+ProductId=0x1300
+
+[Scanner:Target]
+ProcessName=MiAppContable        ; sin .exe
+WindowTitleContains=             ; vacío = solo filtra por proceso
+
+[Scanner:Output]
+OnTerminator=Tab                 ; Tab | TabEnter | TabOnly | Custom
+OutputSuffix={TAB}               ; tokens: {TAB} {ENTER} — usado si OnTerminator=Custom
+
+[Autostart]
+Enabled=true
+
+[Logging]
+MinimumLevel=Information         ; Verbose | Debug | Information | Warning | Error
+LogPayload=true                  ; false en entornos con datos sensibles
 ```
 
 ### Hot-reload
 
-`IOptionsMonitor<ScannerOptions>.OnChange` dispara `ScannerOrchestrator.RestartAsync()`, que cierra el source actual, recarga config y reinicia con los nuevos valores. No requiere reiniciar la app.
+El builder se configura con `AddIniFile(path, optional: false, reloadOnChange: true)`. `IOptionsMonitor<ScannerOptions>.OnChange` dispara `ScannerOrchestrator.RestartAsync()`, que cierra el source actual, recarga config y reinicia con los nuevos valores. No requiere reiniciar la app.
+
+### Lectura/escritura desde la UI Settings
+
+El provider de INI de Microsoft solo **lee**. Para escribir desde la UI Settings al guardar cambios, se implementa `IniConfigWriter` propio (pequeño, ~100 líneas): preserva comentarios y orden de claves, reemplaza valores existentes o agrega claves nuevas en la sección correspondiente. Tras escribir, el `reloadOnChange` toma el cambio automáticamente vía `FileSystemWatcher` interno.
 
 ### UI de configuración
 
@@ -284,7 +298,7 @@ Razón: `KEYEVENTF_UNICODE` con `\n` no dispara correctamente el evento "Enter" 
 | Dispositivo HID no encontrado por VID/PID | `Error` → log + notificación toast → revisa al recibir `WM_DEVICECHANGE` |
 | App destino no abierta cuando llega escaneo | Descarta + log info, sin notificación al usuario (ruidoso) |
 | Excepción en transform o sink | Catch en orchestrator → log error con stack → app sigue corriendo |
-| Excepción al escribir `appsettings.json` | Notificación toast + log error, mantiene valores en memoria |
+| Excepción al escribir `appsettings.ini` | Notificación toast + log error, mantiene valores en memoria |
 | Permisos insuficientes para HKCU\Run | Notificación toast explicando que el autostart falló |
 
 ## 8. Autoarranque
@@ -392,15 +406,19 @@ AutobioKeylogger/                              (carpeta histórica)
 │       │   └── IForegroundWindowProvider.cs
 │       ├── Autostart/
 │       │   └── AutostartManager.cs
-│       └── appsettings.default.json           (template instalable)
+│       ├── Configuration/
+│       │   └── IniConfigWriter.cs             (escritura preservando comentarios)
+│       └── appsettings.default.ini            (template instalable)
 ├── tests/
 │   └── AutolumoBarcodeScannerTool.Tests/
 │       ├── AutolumoBarcodeScannerTool.Tests.csproj
 │       ├── Transforms/
 │       ├── Sources/
 │       │   └── Fakes/ (FakeSerialPort, etc.)
-│       └── Sinks/
-│           └── Fakes/ (FakeInputSink, FakeForegroundWindowProvider)
+│       ├── Sinks/
+│       │   └── Fakes/ (FakeInputSink, FakeForegroundWindowProvider)
+│       └── Configuration/
+│           └── IniConfigWriterTests.cs
 ├── AutolumoBarcodeScannerTool.sln
 └── README.md
 ```
