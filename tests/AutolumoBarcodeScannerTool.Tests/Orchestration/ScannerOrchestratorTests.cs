@@ -1,6 +1,7 @@
 using AutolumoBarcodeScannerTool.Core.Models;
 using AutolumoBarcodeScannerTool.Core.Orchestration;
 using AutolumoBarcodeScannerTool.Core.Transforms;
+using AutolumoBarcodeScannerTool.Tests.Fakes;
 using AutolumoBarcodeScannerTool.Tests.Orchestration.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
@@ -21,7 +22,8 @@ public class ScannerOrchestratorTests
         var source = new FakeInputSource();
         var sink = new FakeSink();
         var sut = new ScannerOrchestrator(source, new IdentityTransform(), sink,
-            NullLogger<ScannerOrchestrator>.Instance);
+            NullLogger<ScannerOrchestrator>.Instance,
+            new StaticOptionsMonitor<DiagnosticsOptions>(new DiagnosticsOptions()));
 
         await sut.StartAsync(CancellationToken.None);
 
@@ -34,7 +36,8 @@ public class ScannerOrchestratorTests
         var source = new FakeInputSource();
         var sink = new FakeSink();
         var sut = new ScannerOrchestrator(source, new IdentityTransform(), sink,
-            NullLogger<ScannerOrchestrator>.Instance);
+            NullLogger<ScannerOrchestrator>.Instance,
+            new StaticOptionsMonitor<DiagnosticsOptions>(new DiagnosticsOptions()));
         await sut.StartAsync(CancellationToken.None);
 
         var ev = new ScanEvent("ABC", ScanTerminator.CrLf, DateTimeOffset.UnixEpoch);
@@ -50,7 +53,8 @@ public class ScannerOrchestratorTests
         var source = new FakeInputSource();
         var sink = new FakeSink();
         var sut = new ScannerOrchestrator(source, new IdentityTransform(), sink,
-            NullLogger<ScannerOrchestrator>.Instance);
+            NullLogger<ScannerOrchestrator>.Instance,
+            new StaticOptionsMonitor<DiagnosticsOptions>(new DiagnosticsOptions()));
         await sut.StartAsync(CancellationToken.None);
 
         await sut.StopAsync(CancellationToken.None);
@@ -64,7 +68,8 @@ public class ScannerOrchestratorTests
         var source = new FakeInputSource();
         var throwingSink = new ThrowingSink();
         var sut = new ScannerOrchestrator(source, new IdentityTransform(), throwingSink,
-            NullLogger<ScannerOrchestrator>.Instance);
+            NullLogger<ScannerOrchestrator>.Instance,
+            new StaticOptionsMonitor<DiagnosticsOptions>(new DiagnosticsOptions()));
         await sut.StartAsync(CancellationToken.None);
 
         await Should.NotThrowAsync(() => source.EmitAsync(

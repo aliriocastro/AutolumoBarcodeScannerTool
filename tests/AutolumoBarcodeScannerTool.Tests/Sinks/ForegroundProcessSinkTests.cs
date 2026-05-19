@@ -1,8 +1,8 @@
 using AutolumoBarcodeScannerTool.Core.Models;
 using AutolumoBarcodeScannerTool.Core.Sinks;
+using AutolumoBarcodeScannerTool.Tests.Fakes;
 using AutolumoBarcodeScannerTool.Tests.Sinks.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using Xunit;
 
@@ -10,25 +10,18 @@ namespace AutolumoBarcodeScannerTool.Tests.Sinks;
 
 public class ForegroundProcessSinkTests
 {
-    private sealed class StaticMonitor<T> : IOptionsMonitor<T>
-    {
-        public StaticMonitor(T value) { CurrentValue = value; }
-        public T CurrentValue { get; }
-        public T Get(string? name) => CurrentValue;
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
-    }
-
     private static (ForegroundProcessSink Sut, FakeForegroundWindowProvider Window, FakeInputInjector Injector)
         Build(string targetProcess, string? titleContains = null)
     {
-        var opts = new StaticMonitor<TargetOptions>(new TargetOptions
+        var opts = new StaticOptionsMonitor<TargetOptions>(new TargetOptions
         {
             ProcessName = targetProcess,
             WindowTitleContains = titleContains
         });
+        var diag = new StaticOptionsMonitor<DiagnosticsOptions>(new DiagnosticsOptions());
         var window = new FakeForegroundWindowProvider();
         var injector = new FakeInputInjector();
-        var sut = new ForegroundProcessSink(opts, window, injector, NullLogger<ForegroundProcessSink>.Instance);
+        var sut = new ForegroundProcessSink(opts, diag, window, injector, NullLogger<ForegroundProcessSink>.Instance);
         return (sut, window, injector);
     }
 

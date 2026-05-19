@@ -1,6 +1,9 @@
 using System.Runtime.InteropServices;
+using AutolumoBarcodeScannerTool.Core.Models;
 using AutolumoBarcodeScannerTool.Core.Sinks;
 using AutolumoBarcodeScannerTool.Hid;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AutolumoBarcodeScannerTool.Win32;
 
@@ -11,6 +14,17 @@ internal sealed class SendInputInjector : IInputInjector
     private const uint INPUT_KEYBOARD = 1;
     private const uint KEYEVENTF_KEYUP = 0x0002;
     private const uint KEYEVENTF_UNICODE = 0x0004;
+
+    private readonly IOptionsMonitor<DiagnosticsOptions> _diag;
+    private readonly ILogger<SendInputInjector> _logger;
+
+    public SendInputInjector(
+        IOptionsMonitor<DiagnosticsOptions> diag,
+        ILogger<SendInputInjector> logger)
+    {
+        _diag = diag;
+        _logger = logger;
+    }
 
     public void SendText(string text)
     {
@@ -27,7 +41,16 @@ internal sealed class SendInputInjector : IInputInjector
 
         if (inputs.Count == 0) return;
         var arr = inputs.ToArray();
-        _ = SendInput((uint)arr.Length, arr, Marshal.SizeOf<INPUT>());
+        var injected = SendInput((uint)arr.Length, arr, Marshal.SizeOf<INPUT>());
+        if (_diag.CurrentValue.VerboseLogging)
+        {
+            var err = injected == arr.Length ? 0 : Marshal.GetLastWin32Error();
+            _logger.LogInformation(
+                "SendInput sent={Sent}/{Total} text='{Text}' (len={Len}) lastError={Err}",
+                injected, arr.Length,
+                text.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t"),
+                text.Length, err);
+        }
     }
 
     private static void AppendVirtualKey(List<INPUT> list, ushort vk)

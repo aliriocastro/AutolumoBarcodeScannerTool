@@ -119,6 +119,7 @@ internal static class Program
             {
                 services.Configure<ScannerOptions>(ctx.Configuration.GetSection(ScannerOptions.SectionName));
                 services.Configure<TargetOptions>(ctx.Configuration.GetSection($"{ScannerOptions.SectionName}:Target"));
+                services.Configure<DiagnosticsOptions>(ctx.Configuration.GetSection(DiagnosticsOptions.SectionName));
                 services.Configure<AutostartOptions>(ctx.Configuration.GetSection(AutostartOptions.SectionName));
                 services.Configure<LoggingOptions>(ctx.Configuration.GetSection(LoggingOptions.SectionName));
 
@@ -133,10 +134,12 @@ internal static class Program
                 {
                     var opts = sp.GetRequiredService<IOptionsMonitor<ScannerOptions>>().CurrentValue;
                     var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+                    var diag = sp.GetRequiredService<IOptionsMonitor<DiagnosticsOptions>>();
+                    var fg = sp.GetRequiredService<IForegroundWindowProvider>();
                     return opts.SourceType switch
                     {
                         SourceType.Serial => CreateSerial(opts, loggerFactory),
-                        SourceType.HidKeyboard => CreateHid(opts, loggerFactory),
+                        SourceType.HidKeyboard => CreateHid(opts, loggerFactory, diag, fg),
                         _ => throw new InvalidOperationException("SourceType desconocido")
                     };
                 });
@@ -161,9 +164,14 @@ internal static class Program
             lf.CreateLogger<SerialInputSource>());
     }
 
-    private static IInputSource CreateHid(ScannerOptions opts, ILoggerFactory lf) =>
+    private static IInputSource CreateHid(
+        ScannerOptions opts,
+        ILoggerFactory lf,
+        IOptionsMonitor<DiagnosticsOptions> diag,
+        IForegroundWindowProvider foreground) =>
         new HidKeyboardInputSource(
             opts.HidKeyboard.VendorId, opts.HidKeyboard.ProductId,
-            opts.Terminator, lf.CreateLogger<HidKeyboardInputSource>());
+            opts.Terminator, lf.CreateLogger<HidKeyboardInputSource>(),
+            diag, foreground);
 }
 

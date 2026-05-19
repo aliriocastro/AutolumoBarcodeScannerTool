@@ -7,6 +7,7 @@ namespace AutolumoBarcodeScannerTool.Core.Sinks;
 public sealed class ForegroundProcessSink : IInputSink
 {
     private readonly IOptionsMonitor<TargetOptions> _opts;
+    private readonly IOptionsMonitor<DiagnosticsOptions> _diag;
     private readonly IForegroundWindowProvider _window;
     private readonly IInputInjector _injector;
     private readonly ILogger<ForegroundProcessSink> _logger;
@@ -18,11 +19,13 @@ public sealed class ForegroundProcessSink : IInputSink
     // ActivatorUtilities.CreateInstance), so we cannot use it to disambiguate.
     public ForegroundProcessSink(
         IOptionsMonitor<TargetOptions> opts,
+        IOptionsMonitor<DiagnosticsOptions> diag,
         IForegroundWindowProvider window,
         IInputInjector injector,
         ILogger<ForegroundProcessSink> logger)
     {
         _opts = opts;
+        _diag = diag;
         _window = window;
         _injector = injector;
         _logger = logger;
@@ -63,6 +66,13 @@ public sealed class ForegroundProcessSink : IInputSink
                     current.WindowTitle, target.WindowTitleContains);
                 return;
             }
+
+            if (_diag.CurrentValue.VerboseLogging)
+                _logger.LogInformation(
+                    "Inyectando hacia '{Proc}'/'{Title}' payload='{Payload}' (len={Len})",
+                    current.ProcessName, current.WindowTitle,
+                    ev.Payload.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t"),
+                    ev.Payload.Length);
 
             // SendInput is a fast Win32 syscall; running inline avoids both
             // threadpool overhead and TOCTOU where the foreground window could

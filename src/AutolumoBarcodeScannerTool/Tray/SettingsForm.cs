@@ -32,6 +32,8 @@ internal sealed class SettingsForm : Form
     private readonly TextBox _processName = new();
     private readonly TextBox _windowTitleContains = new();
 
+    private readonly CheckBox _verboseLogging = new() { Text = "Logging verbose (debug del pipeline completo)", AutoSize = true };
+
     private readonly Button _save = new() { Text = "Guardar", Width = 100 };
     private readonly Button _cancel = new() { Text = "Cancelar", Width = 100 };
 
@@ -121,7 +123,41 @@ internal sealed class SettingsForm : Form
             outputInfo
         ));
 
-        _tabs.TabPages.AddRange(new[] { general, serial, hid, target });
+        var diag = new TabPage("Diagnóstico");
+        var diagInfo = new Label
+        {
+            Text = "Si está activo, cada lectura del lector, cada decisión del hook " +
+                   "anti-eco, la ventana activa, la transformación aplicada y cada " +
+                   "llamada a SendInput se loggean a:\r\n\r\n" +
+                   "%LOCALAPPDATA%\\AutolumoBarcodeScannerTool\\logs\\app-AAAAMMDD.log\r\n\r\n" +
+                   "Útil cuando lo que se escribe en el destino no es lo esperado. " +
+                   "Desactivar en producción (genera ruido).",
+            AutoSize = false,
+            Width = 480,
+            Height = 130,
+            ForeColor = Color.DimGray
+        };
+        var openLogsBtn = new Button
+        {
+            Text = "Abrir carpeta de logs",
+            Width = 200,
+            AutoSize = false
+        };
+        openLogsBtn.Click += (_, _) =>
+        {
+            var logsDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "AutolumoBarcodeScannerTool", "logs");
+            Directory.CreateDirectory(logsDir);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = logsDir,
+                UseShellExecute = true
+            });
+        };
+        diag.Controls.Add(Stack(8, _verboseLogging, diagInfo, openLogsBtn));
+
+        _tabs.TabPages.AddRange(new[] { general, serial, hid, target, diag });
         Controls.Add(_tabs);
     }
 
@@ -158,6 +194,8 @@ internal sealed class SettingsForm : Form
 
         _processName.Text = _opts.Target.ProcessName;
         _windowTitleContains.Text = _opts.Target.WindowTitleContains ?? "";
+
+        _verboseLogging.Checked = _opts.Diagnostics.VerboseLogging;
     }
 
     private void Save()
@@ -177,6 +215,7 @@ internal sealed class SettingsForm : Form
             contents = IniConfigWriter.Update(contents, "Scanner:HidKeyboard:ProductId", _pid.Text);
             contents = IniConfigWriter.Update(contents, "Scanner:Target:ProcessName", _processName.Text);
             contents = IniConfigWriter.Update(contents, "Scanner:Target:WindowTitleContains", _windowTitleContains.Text);
+            contents = IniConfigWriter.Update(contents, "Scanner:Diagnostics:VerboseLogging", _verboseLogging.Checked ? "true" : "false");
             File.WriteAllText(_configPath, contents);
 
             // Environment.ProcessPath returns the launcher .exe even for single-file

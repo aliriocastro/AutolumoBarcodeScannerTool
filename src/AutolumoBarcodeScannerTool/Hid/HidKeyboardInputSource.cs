@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using AutolumoBarcodeScannerTool.Core.Models;
+using AutolumoBarcodeScannerTool.Core.Sinks;
 using AutolumoBarcodeScannerTool.Core.Sources;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using static AutolumoBarcodeScannerTool.Hid.RawInputInterop;
 
 namespace AutolumoBarcodeScannerTool.Hid;
@@ -13,6 +15,8 @@ internal sealed class HidKeyboardInputSource : NativeWindow, IInputSource
     private readonly string _productIdHex;
     private readonly ScanTerminator _terminator;
     private readonly ILogger<HidKeyboardInputSource> _logger;
+    private readonly IOptionsMonitor<DiagnosticsOptions> _diag;
+    private readonly IForegroundWindowProvider _foreground;
     private readonly ConcurrentQueue<(uint VKey, DateTime When, IntPtr Device)> _recentScannerKeys = new();
     private readonly System.Text.StringBuilder _payload = new();
     private LowLevelKeyboardHook? _hook;
@@ -26,13 +30,19 @@ internal sealed class HidKeyboardInputSource : NativeWindow, IInputSource
         string vendorIdHex,
         string productIdHex,
         ScanTerminator terminator,
-        ILogger<HidKeyboardInputSource> logger)
+        ILogger<HidKeyboardInputSource> logger,
+        IOptionsMonitor<DiagnosticsOptions> diag,
+        IForegroundWindowProvider foreground)
     {
         _vendorIdHex = NormalizeHex(vendorIdHex);
         _productIdHex = NormalizeHex(productIdHex);
         _terminator = terminator;
         _logger = logger;
+        _diag = diag;
+        _foreground = foreground;
     }
+
+    private bool Verbose => _diag.CurrentValue.VerboseLogging;
 
     public SourceConnectionState State => _state;
 
@@ -61,6 +71,9 @@ internal sealed class HidKeyboardInputSource : NativeWindow, IInputSource
         _scannerDeviceNameFragment = $"VID_{_vendorIdHex}&PID_{_productIdHex}";
         _hook = new LowLevelKeyboardHook(ShouldSuppress);
         _hook.Install();
+        _logger.LogInformation(
+            "HID source iniciada — filtro={Filter}, terminator={Terminator}, verbose={Verbose}",
+            _scannerDeviceNameFragment, _terminator, Verbose);
         SetState(SourceConnectionState.Connected);
         return Task.CompletedTask;
     }
@@ -101,7 +114,12 @@ internal sealed class HidKeyboardInputSource : NativeWindow, IInputSource
             if (input.Header.Type != 1) return; // RIM_TYPEKEYBOARD == 1
 
             var deviceName = GetDeviceName(input.Header.DeviceHandle) ?? "";
-            if (!IsScannerDevice(deviceName)) return;
+            var isScanner = IsScannerDevice(deviceName);
+            if (Verbose)
+                _logger.LogInformation(
+                    "WM_INPUT VK=0x{VK:X2} scan=0x{Scan:X2} flags=0x{Flags:X2} device='{Device}' matchScanner={Match}",
+                    input.Keyboard.VKey, input.Keyboard.MakeCode, input.Keyboard.Flags, deviceName, isScanner);
+            if (!isScanner) return;
 
             // Solo nos interesa keydown
             const ushort RI_KEY_BREAK = 0x01;
@@ -114,7 +132,21 @@ internal sealed class HidKeyboardInputSource : NativeWindow, IInputSource
             // ToUnicodeEx soporta todos los caracteres alfanuméricos, símbolos (-, ., :, /, _, espacio),
             // y respeta layout (US-QWERTY, ES, etc.). Sin esto los barcodes con símbolos se truncan.
             var translated = VKeyToText(input.Keyboard.VKey, input.Keyboard.MakeCode);
-            if (translated is null || translated.Length == 0) return;
+            if (translated is null || translated.Length == 0)
+            {
+                if (Verbose)
+                    _logger.LogInformation(
+                        "VK=0x{VK:X2} no produjo char traducible (ToUnicodeEx vacío) — descartado",
+                        input.Keyboard.VKey);
+                return;
+            }
+
+            if (Verbose)
+                _logger.LogInformation(
+                    "VK=0x{VK:X2} → '{Char}' (codes={Codes})",
+                    input.Keyboard.VKey,
+                    System.Text.RegularExpressions.Regex.Replace(translated, "[\\r\\n\\t]", m => m.Value switch { "\r" => "\\r", "\n" => "\\n", "\t" => "\\t", _ => m.Value }),
+                    string.Join(",", translated.Select(c => $"0x{(int)c:X2}")));
 
             lock (_payload)
             {
@@ -123,9 +155,24 @@ internal sealed class HidKeyboardInputSource : NativeWindow, IInputSource
                     if (ch == '\r' || ch == '\n')
                     {
                         var detected = ResolveTerminator(ch);
-                        if (detected is null) continue;
+                        if (detected is null)
+                        {
+                            if (Verbose)
+                                _logger.LogInformation(
+                                    "Terminador 0x{Char:X2} ignorado en modo {Mode}",
+                                    (int)ch, _terminator);
+                            continue;
+                        }
                         var text = _payload.ToString();
                         _payload.Clear();
+                        if (Verbose)
+                        {
+                            var fg = _foreground.GetCurrent();
+                            _logger.LogInformation(
+                                "ScanEvent emitido — payload='{Payload}' (len={Len}) terminator={Term} foreground='{Proc}'/'{Title}'",
+                                text, text.Length, detected.Value,
+                                fg?.ProcessName ?? "<none>", fg?.WindowTitle ?? "<none>");
+                        }
                         OnScan?.Invoke(new ScanEvent(text, detected.Value, DateTimeOffset.UtcNow));
                     }
                     else
@@ -173,7 +220,13 @@ internal sealed class HidKeyboardInputSource : NativeWindow, IInputSource
         // output is eaten by the burst heuristic because it lands inside
         // the "recent scanner activity" window we set 6 lines down.
         if (dwExtraInfo == InjectionMarker.Sentinel)
+        {
+            if (Verbose)
+                _logger.LogInformation(
+                    "LL hook VK=0x{VK:X2} dwExtraInfo=0x{Extra:X} ⇒ NO-SUPPRESS (sentinel propio)",
+                    vkCode, dwExtraInfo.ToInt64());
             return false;
+        }
 
         var now = DateTime.UtcNow;
         var matchCutoff = now.AddMilliseconds(-50);
@@ -204,8 +257,16 @@ internal sealed class HidKeyboardInputSource : NativeWindow, IInputSource
         _lastHookKeyTime = now;
 
         var burstSuppress = hasRecentScannerActivity && _consecutiveBurstKeys >= BurstMinimumKeys;
+        var suppress = queueMatched || burstSuppress;
 
-        return queueMatched || burstSuppress;
+        if (Verbose)
+            _logger.LogInformation(
+                "LL hook VK=0x{VK:X2} dwExtraInfo=0x{Extra:X} queueMatched={Q} burstSuppress={B} (gap={Gap}ms burstN={N} scannerActive={A}) ⇒ {Decision}",
+                vkCode, dwExtraInfo.ToInt64(), queueMatched, burstSuppress,
+                (int)gap, _consecutiveBurstKeys, hasRecentScannerActivity,
+                suppress ? "SUPPRESS" : "PASS");
+
+        return suppress;
     }
 
     private void TrimRecent()

@@ -10,6 +10,21 @@ public sealed class ScannerOptions
     public SerialOptions Serial { get; set; } = new();
     public HidKeyboardOptions HidKeyboard { get; set; } = new();
     public TargetOptions Target { get; set; } = new();
+    public DiagnosticsOptions Diagnostics { get; set; } = new();
+}
+
+public sealed class DiagnosticsOptions
+{
+    public const string SectionName = "Scanner:Diagnostics";
+
+    // Cuando es true, el pipeline loggea cada paso a Information:
+    // - Cada tecla recibida por WM_INPUT (VK, scan code, char traducido, dispositivo)
+    // - Cada decisión del WH_KEYBOARD_LL hook (sentinel match, supresión)
+    // - Cada ScanEvent emitido (payload crudo + ventana activa)
+    // - Cada transformación aplicada (antes/después)
+    // - Cada llamada a SendInput (texto + nInputs + return code)
+    // Útil para diagnosticar capturas que no llegan al destino esperado.
+    public bool VerboseLogging { get; set; } = false;
 }
 
 public sealed class SerialOptions
