@@ -8,11 +8,16 @@ internal sealed class LowLevelKeyboardHook : IDisposable
     private const int WM_KEYDOWN = 0x0100;
     private const int WM_SYSKEYDOWN = 0x0104;
 
-    private readonly Func<int, IntPtr, bool> _shouldSuppress;
+    // flags bit en KBDLLHOOKSTRUCT.flags que Windows pone para eventos de
+    // SendInput / keybd_event — más fiable que pasar un sentinel por dwExtraInfo,
+    // que puede ser filtrado o descartado en algunas rutas del input pipeline.
+    private const uint LLKHF_INJECTED = 0x10;
+
+    private readonly Func<int, uint, IntPtr, bool> _shouldSuppress;
     private readonly LowLevelKeyboardProc _proc;
     private IntPtr _hookId = IntPtr.Zero;
 
-    public LowLevelKeyboardHook(Func<int, IntPtr, bool> shouldSuppress)
+    public LowLevelKeyboardHook(Func<int, uint, IntPtr, bool> shouldSuppress)
     {
         _shouldSuppress = shouldSuppress;
         _proc = HookCallback;
@@ -42,7 +47,7 @@ internal sealed class LowLevelKeyboardHook : IDisposable
         if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)
         {
             var data = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
-            if (_shouldSuppress((int)data.vkCode, data.dwExtraInfo))
+            if (_shouldSuppress((int)data.vkCode, data.flags, data.dwExtraInfo))
                 return (IntPtr)1;
         }
         return CallNextHookEx(_hookId, nCode, wParam, lParam);

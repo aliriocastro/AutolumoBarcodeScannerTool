@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Threading;
 using AutolumoBarcodeScannerTool.Diag;
 using AutolumoBarcodeScannerTool.Win32;
 using static AutolumoBarcodeScannerTool.Hid.RawInputInterop;
@@ -20,8 +21,10 @@ internal sealed class ScannerKeyTracker : NativeWindow, IDisposable
 {
     private const ushort VK_SPACE = 0x20;
     private const ushort RI_KEY_BREAK = 0x01;
+    private static readonly IntPtr HWND_MESSAGE = new(-3);
 
     private readonly string _scannerDeviceFragment;
+    private long _wmInputCount;
 
     public ScannerKeyTracker(string vendorIdHex, string productIdHex)
     {
@@ -30,8 +33,18 @@ internal sealed class ScannerKeyTracker : NativeWindow, IDisposable
 
     public void Start()
     {
-        var cp = new CreateParams { Caption = "AutolumoScannerKeyTracker", X = 0, Y = 0, Width = 0, Height = 0 };
+        // Message-only window (HWND_MESSAGE parent) — diseñada explícitamente
+        // para recibir mensajes sin ser visible. Una NativeWindow overlapped
+        // top-level invisible NO recibe WM_INPUT de forma fiable en .NET 10
+        // (síntoma observado en v0.2.3: LL hook dispara pero WM_INPUT nunca
+        // llega al WndProc, así que la re-inyección nunca se intenta).
+        var cp = new CreateParams
+        {
+            Caption = "AutolumoScannerKeyTracker",
+            Parent = HWND_MESSAGE
+        };
         CreateHandle(cp);
+        AppLog.Info($"ScannerKeyTracker.Handle=0x{Handle.ToInt64():X} (message-only)");
 
         var devices = new[]
         {
@@ -43,9 +56,11 @@ internal sealed class ScannerKeyTracker : NativeWindow, IDisposable
                 WindowHandle = Handle
             }
         };
-        if (!RegisterRawInputDevices(devices, 1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>()))
-            throw new InvalidOperationException(
-                $"RegisterRawInputDevices falló: {Marshal.GetLastWin32Error()}");
+        var ok = RegisterRawInputDevices(devices, 1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
+        var err = Marshal.GetLastWin32Error();
+        AppLog.Info($"RegisterRawInputDevices ok={ok} lastError={err} fragment={_scannerDeviceFragment}");
+        if (!ok)
+            throw new InvalidOperationException($"RegisterRawInputDevices falló: {err}");
     }
 
     public void Stop()
@@ -55,7 +70,14 @@ internal sealed class ScannerKeyTracker : NativeWindow, IDisposable
 
     protected override void WndProc(ref Message m)
     {
-        if (m.Msg == WM_INPUT) HandleRawInput(m.LParam);
+        if (m.Msg == WM_INPUT)
+        {
+            var n = Interlocked.Increment(ref _wmInputCount);
+            // Log de heartbeat — sólo el primer mensaje + cada 50 después,
+            // para confirmar que el pipeline funciona sin saturar el log.
+            if (n == 1 || n % 50 == 0) AppLog.Debug($"WM_INPUT recibidos hasta ahora: {n}");
+            HandleRawInput(m.LParam);
+        }
         base.WndProc(ref m);
     }
 

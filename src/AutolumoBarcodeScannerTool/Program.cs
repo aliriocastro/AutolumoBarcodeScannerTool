@@ -39,7 +39,7 @@ internal static class Program
 
         var config = ConfigIo.Load(configPath);
         AppLog.Init(logDir, config.VerboseLogging);
-        AppLog.Info($"=== arranque v0.2.3 — VID={config.VendorId} PID={config.ProductId} " +
+        AppLog.Info($"=== arranque v0.2.4 — VID={config.VendorId} PID={config.ProductId} " +
                     $"verbose={config.VerboseLogging} ===");
 
         var autostart = new AutostartManager();
@@ -66,11 +66,11 @@ internal static class Program
         // LL hook: suprime preventivamente cualquier VK_SPACE no marcado por
         // nosotros (sentinel). El WndProc del tracker es quien decide después
         // si re-inyectarlo (era humano) o dejarlo bloqueado (era del lector).
-        using var hook = new LowLevelKeyboardHook((vk, dwExtraInfo) =>
+        using var hook = new LowLevelKeyboardHook((vk, flags, dwExtraInfo) =>
         {
-            var decision = SpaceSuppressor.ShouldSuppress(vk, dwExtraInfo);
+            var decision = SpaceSuppressor.ShouldSuppress(vk, flags, dwExtraInfo);
             if (vk == 0x20)
-                AppLog.Debug($"LL hook VK=SPACE dwExtraInfo=0x{dwExtraInfo.ToInt64():X} decision={(decision ? "SUPPRESS" : "PASS")}");
+                AppLog.Debug($"LL hook VK=SPACE flags=0x{flags:X} dwExtraInfo=0x{dwExtraInfo.ToInt64():X} decision={(decision ? "SUPPRESS" : "PASS")}");
             return decision;
         });
         hook.Install();
