@@ -36,8 +36,11 @@ public static class ConfigIo
             ProductId = values.TryGetValue(KeyProduct, out var p) ? p : d.ProductId,
             TargetProcessName = values.TryGetValue(KeyProcess, out var pr) ? pr : d.TargetProcessName,
             TargetWindowTitleContains = values.TryGetValue(KeyTitle, out var t) ? t : d.TargetWindowTitleContains,
-            AutostartEnabled = values.TryGetValue(KeyAutostart, out var a)
-                ? bool.TryParse(a, out var ab) && ab
+            // Malformed bool values (e.g. "yes", "1") fall back to default rather
+            // than silently mapping to false — a hand-edited file shouldn't flip
+            // a default-true setting to false without saying so.
+            AutostartEnabled = values.TryGetValue(KeyAutostart, out var a) && bool.TryParse(a, out var ab)
+                ? ab
                 : d.AutostartEnabled
         };
     }

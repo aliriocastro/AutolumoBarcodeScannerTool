@@ -122,4 +122,20 @@ public class ConfigIoTests
         }
         finally { File.Delete(path); }
     }
+
+    [Fact]
+    public void Load_MalformedBoolValue_FallsBackToDefault()
+    {
+        // A hand-edited "yes" / "1" / "on" must NOT silently disable a
+        // default-true setting. Falls back to ScannerConfig.Default.AutostartEnabled.
+        var path = TempPath();
+        File.WriteAllText(path, "AutostartEnabled=yes\n");
+        try
+        {
+            var cfg = ConfigIo.Load(path);
+
+            cfg.AutostartEnabled.ShouldBe(ScannerConfig.Default.AutostartEnabled);
+        }
+        finally { File.Delete(path); }
+    }
 }
