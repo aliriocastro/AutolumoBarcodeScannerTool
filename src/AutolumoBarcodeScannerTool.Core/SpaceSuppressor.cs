@@ -2,8 +2,8 @@ namespace AutolumoBarcodeScannerTool.Core;
 
 public static class SpaceSuppressor
 {
-    public const int VK_SPACE = 0x20;
-    public const int ScannerWindowMs = 100;
+    private const int VK_SPACE = 0x20;
+    private const int ScannerWindowMs = 100;
 
     // Returns true ⇔ the keystroke should be suppressed at the LL hook layer.
     // Suppress only when ALL of:
