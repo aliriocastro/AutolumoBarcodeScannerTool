@@ -59,11 +59,14 @@ internal static class Program
         }
 
         // LL hook callback: combine tracker timestamp + foreground window check.
+        // ForegroundWindow.GetCurrent is passed as a method group — SpaceSuppressor
+        // only invokes it after the cheap vk/time guards pass, so non-space
+        // keystrokes never trigger the Win32 + Process.GetProcessById syscall.
         using var hook = new LowLevelKeyboardHook(vk => SpaceSuppressor.ShouldSuppress(
             vk,
             DateTime.UtcNow,
             tracker.LastScannerKeyTime,
-            ForegroundWindow.GetCurrent(),
+            ForegroundWindow.GetCurrent,
             config.TargetProcessName,
             config.TargetWindowTitleContains));
         hook.Install();

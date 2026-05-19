@@ -12,24 +12,31 @@ public static class SpaceSuppressor
     //   • the foreground window matches the configured target
     // If both filter strings are empty, the target check passes (suppress applies
     // wherever the focus is — least-surprise default).
+    //
+    // `foreground` is a factory, not a value, so the (potentially expensive)
+    // Win32 + Process.GetProcessById call only runs for keys that already
+    // passed the cheap vk-and-time guards. The LL hook fires on every keydown
+    // in the system; non-space keys must return in microseconds.
     public static bool ShouldSuppress(
         int vk,
         DateTime now,
         DateTime lastScannerKey,
-        ForegroundWindowInfo? foreground,
+        Func<ForegroundWindowInfo?> foreground,
         string targetProcessName,
         string targetWindowTitleContains)
     {
         if (vk != VK_SPACE) return false;
         if ((now - lastScannerKey).TotalMilliseconds >= ScannerWindowMs) return false;
-        if (foreground is null) return false;
+
+        var fg = foreground();
+        if (fg is null) return false;
 
         if (!string.IsNullOrEmpty(targetProcessName) &&
-            !string.Equals(foreground.ProcessName, targetProcessName, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(fg.ProcessName, targetProcessName, StringComparison.OrdinalIgnoreCase))
             return false;
 
         if (!string.IsNullOrEmpty(targetWindowTitleContains) &&
-            foreground.WindowTitle.IndexOf(targetWindowTitleContains, StringComparison.OrdinalIgnoreCase) < 0)
+            fg.WindowTitle.IndexOf(targetWindowTitleContains, StringComparison.OrdinalIgnoreCase) < 0)
             return false;
 
         return true;
