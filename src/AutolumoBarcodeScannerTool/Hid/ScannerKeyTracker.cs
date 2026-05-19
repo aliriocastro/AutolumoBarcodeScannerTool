@@ -1,17 +1,27 @@
 using System.Runtime.InteropServices;
 using AutolumoBarcodeScannerTool.Diag;
+using AutolumoBarcodeScannerTool.Win32;
 using static AutolumoBarcodeScannerTool.Hid.RawInputInterop;
 
 namespace AutolumoBarcodeScannerTool.Hid;
 
-// Registers a Raw Input hidden window for keyboard devices. Every WM_INPUT
-// whose source device matches "VID_xxxx&PID_yyyy" stamps the current time
-// into LastScannerKeyTime. The LL hook reads that value to decide whether a
-// VK_SPACE belongs to a scanner burst or to the human keyboard.
+// Registra un hidden NativeWindow para recibir WM_INPUT de todos los teclados.
+// El LL hook suprime preventivamente TODO VK_SPACE no marcado con nuestro
+// sentinel. Esta clase es la segunda mitad del contrato: cuando llega un
+// WM_INPUT de SPACE, identifica el dispositivo origen y decide:
+//
+//   • Si proviene del lector configurado (VID/PID match): DROP (el LL hook ya
+//     lo bloqueó, no hacemos nada).
+//   • Si proviene de otro dispositivo (teclado humano): SpaceInjector.SendSpace
+//     re-inyecta el SPACE con sentinel, que el LL hook reconoce y deja pasar.
+//
+// El usuario experimenta ~5 ms de lag en sus espacios manuales — imperceptible.
 internal sealed class ScannerKeyTracker : NativeWindow, IDisposable
 {
+    private const ushort VK_SPACE = 0x20;
+    private const ushort RI_KEY_BREAK = 0x01;
+
     private readonly string _scannerDeviceFragment;
-    public DateTime LastScannerKeyTime { get; private set; } = DateTime.MinValue;
 
     public ScannerKeyTracker(string vendorIdHex, string productIdHex)
     {
@@ -62,17 +72,29 @@ internal sealed class ScannerKeyTracker : NativeWindow, IDisposable
             var input = Marshal.PtrToStructure<RAWINPUT>(buffer);
             if (input.Header.Type != 1) return; // RIM_TYPEKEYBOARD == 1
 
-            // Solo keydown — keyup también dispara WM_INPUT pero no nos importa
-            // marcar la ventana de actividad para el keyup.
-            const ushort RI_KEY_BREAK = 0x01;
+            // Sólo nos interesa keydown; el keyup también genera WM_INPUT
+            // pero no tiene impacto en la re-inyección (SpaceInjector emite
+            // su propio down+up).
             if ((input.Keyboard.Flags & RI_KEY_BREAK) != 0) return;
 
-            var deviceName = GetDeviceName(input.Header.DeviceHandle) ?? "";
-            var matches = deviceName.Contains(_scannerDeviceFragment, StringComparison.OrdinalIgnoreCase);
-            AppLog.Debug($"WM_INPUT vk=0x{input.Keyboard.VKey:X2} device='{deviceName}' matchesConfigured={matches}");
-            if (!matches) return;
+            // Nada que hacer si no es un SPACE — los demás keys nunca son
+            // suprimidos por el LL hook, fluyen normalmente al foreground.
+            if (input.Keyboard.VKey != VK_SPACE) return;
 
-            LastScannerKeyTime = DateTime.UtcNow;
+            var deviceName = GetDeviceName(input.Header.DeviceHandle) ?? "";
+            var fromScanner = deviceName.Contains(_scannerDeviceFragment, StringComparison.OrdinalIgnoreCase);
+            AppLog.Debug($"WM_INPUT VK=SPACE device='{deviceName}' fromScanner={fromScanner} action={(fromScanner ? "DROP" : "REINJECT")}");
+
+            if (fromScanner)
+            {
+                // El LL hook ya lo bloqueó. No hacemos nada — el destino
+                // nunca verá ese SPACE.
+                return;
+            }
+
+            // Era un SPACE del teclado humano. El LL hook lo bloqueó
+            // preventivamente; lo restauramos vía SendInput con sentinel.
+            SpaceInjector.SendSpace();
         }
         finally
         {

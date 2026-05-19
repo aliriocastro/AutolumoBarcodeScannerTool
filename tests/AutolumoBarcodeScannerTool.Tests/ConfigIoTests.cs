@@ -13,7 +13,6 @@ public class ConfigIoTests
     public void Load_MissingFile_ReturnsDefault()
     {
         var path = TempPath();
-        // do not create file
 
         var cfg = ConfigIo.Load(path);
 
@@ -29,10 +28,7 @@ public class ConfigIoTests
             var original = new ScannerConfig(
                 VendorId: "0x0C2E",
                 ProductId: "0x0B61",
-                TargetProcessName: "MiAppContable",
-                TargetWindowTitleContains: "Factura",
                 AutostartEnabled: false,
-                IgnoreWindowFilter: true,
                 VerboseLogging: true);
 
             ConfigIo.Save(path, original);
@@ -56,7 +52,6 @@ public class ConfigIoTests
 
             cfg.VendorId.ShouldBe("0x1234");
             cfg.ProductId.ShouldBe("0xABCD");
-            cfg.TargetProcessName.ShouldBe(ScannerConfig.Default.TargetProcessName);
             cfg.AutostartEnabled.ShouldBe(ScannerConfig.Default.AutostartEnabled);
         }
         finally { File.Delete(path); }
@@ -65,12 +60,13 @@ public class ConfigIoTests
     [Fact]
     public void Load_IgnoresUnknownKeys()
     {
-        // Compatibility with the v0.1.5 .ini which had a Scanner:Serial:BaudRate etc.
+        // Compatibilidad con .ini de v0.2.1 que tenía TargetProcessName,
+        // IgnoreWindowFilter, etc. — ahora se ignoran silenciosamente.
         var path = TempPath();
         File.WriteAllText(path,
             "VendorId=0xAAAA\n" +
-            "Scanner:Serial:BaudRate=9600\n" +
-            "Scanner:Diagnostics:VerboseLogging=true\n" +
+            "TargetProcessName=oldfield\n" +
+            "IgnoreWindowFilter=true\n" +
             "ProductId=0xBBBB\n");
         try
         {
@@ -92,15 +88,13 @@ public class ConfigIoTests
             "[Scanner]\n" +
             "\n" +
             "VendorId=0x9999\n" +
-            "  ProductId  =  0x8888  \n" +
-            "TargetProcessName=AppX\n");
+            "  ProductId  =  0x8888  \n");
         try
         {
             var cfg = ConfigIo.Load(path);
 
             cfg.VendorId.ShouldBe("0x9999");
             cfg.ProductId.ShouldBe("0x8888");
-            cfg.TargetProcessName.ShouldBe("AppX");
         }
         finally { File.Delete(path); }
     }
@@ -111,16 +105,15 @@ public class ConfigIoTests
         var path = TempPath();
         try
         {
-            ConfigIo.Save(path, new ScannerConfig("0x1111", "0x2222", "AppA", "", true, false, false));
-            ConfigIo.Save(path, new ScannerConfig("0x3333", "0x4444", "AppB", "filter", false, false, false));
+            ConfigIo.Save(path, new ScannerConfig("0x1111", "0x2222", true, false));
+            ConfigIo.Save(path, new ScannerConfig("0x3333", "0x4444", false, true));
 
             var loaded = ConfigIo.Load(path);
 
             loaded.VendorId.ShouldBe("0x3333");
             loaded.ProductId.ShouldBe("0x4444");
-            loaded.TargetProcessName.ShouldBe("AppB");
-            loaded.TargetWindowTitleContains.ShouldBe("filter");
             loaded.AutostartEnabled.ShouldBeFalse();
+            loaded.VerboseLogging.ShouldBeTrue();
         }
         finally { File.Delete(path); }
     }
@@ -128,8 +121,6 @@ public class ConfigIoTests
     [Fact]
     public void Load_MalformedBoolValue_FallsBackToDefault()
     {
-        // A hand-edited "yes" / "1" / "on" must NOT silently disable a
-        // default-true setting. Falls back to ScannerConfig.Default.AutostartEnabled.
         var path = TempPath();
         File.WriteAllText(path, "AutostartEnabled=yes\n");
         try

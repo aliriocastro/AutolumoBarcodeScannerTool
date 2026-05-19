@@ -4,10 +4,7 @@ public static class ConfigIo
 {
     private const string KeyVendor = "VendorId";
     private const string KeyProduct = "ProductId";
-    private const string KeyProcess = "TargetProcessName";
-    private const string KeyTitle = "TargetWindowTitleContains";
     private const string KeyAutostart = "AutostartEnabled";
-    private const string KeyIgnoreWindow = "IgnoreWindowFilter";
     private const string KeyVerbose = "VerboseLogging";
 
     public static ScannerConfig Load(string path)
@@ -36,17 +33,13 @@ public static class ConfigIo
         {
             VendorId = values.TryGetValue(KeyVendor, out var v) ? v : d.VendorId,
             ProductId = values.TryGetValue(KeyProduct, out var p) ? p : d.ProductId,
-            TargetProcessName = values.TryGetValue(KeyProcess, out var pr) ? pr : d.TargetProcessName,
-            TargetWindowTitleContains = values.TryGetValue(KeyTitle, out var t) ? t : d.TargetWindowTitleContains,
             AutostartEnabled = ParseBoolOrDefault(values, KeyAutostart, d.AutostartEnabled),
-            IgnoreWindowFilter = ParseBoolOrDefault(values, KeyIgnoreWindow, d.IgnoreWindowFilter),
             VerboseLogging = ParseBoolOrDefault(values, KeyVerbose, d.VerboseLogging)
         };
     }
 
-    // Malformed bool values (e.g. "yes", "1") fall back to default rather than
-    // silently mapping to false — a hand-edited file shouldn't flip a default-true
-    // setting to false without saying so.
+    // Malformed bool values fall back to default rather than silently mapping
+    // to false — a hand-edited file shouldn't flip a default-true setting.
     private static bool ParseBoolOrDefault(Dictionary<string, string> values, string key, bool dflt) =>
         values.TryGetValue(key, out var a) && bool.TryParse(a, out var ab) ? ab : dflt;
 
@@ -59,10 +52,7 @@ public static class ConfigIo
         {
             $"{KeyVendor}={config.VendorId}",
             $"{KeyProduct}={config.ProductId}",
-            $"{KeyProcess}={config.TargetProcessName}",
-            $"{KeyTitle}={config.TargetWindowTitleContains}",
             $"{KeyAutostart}={(config.AutostartEnabled ? "true" : "false")}",
-            $"{KeyIgnoreWindow}={(config.IgnoreWindowFilter ? "true" : "false")}",
             $"{KeyVerbose}={(config.VerboseLogging ? "true" : "false")}"
         };
         File.WriteAllLines(path, lines);

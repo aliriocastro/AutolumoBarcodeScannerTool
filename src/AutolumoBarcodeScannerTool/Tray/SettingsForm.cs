@@ -13,11 +13,8 @@ internal sealed class SettingsForm : Form
     private readonly ComboBox _hidDevice = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 480 };
     private readonly TextBox _vid = new() { Width = 100, ReadOnly = true };
     private readonly TextBox _pid = new() { Width = 100, ReadOnly = true };
-    private readonly TextBox _processName = new() { Width = 480 };
-    private readonly TextBox _windowTitleContains = new() { Width = 480 };
     private readonly CheckBox _autostartChk = new() { Text = "Iniciar con Windows", AutoSize = true };
-    private readonly CheckBox _ignoreFilterChk = new() { Text = "Ignorar filtro de ventana (modo prueba — suprime en cualquier app)", AutoSize = true };
-    private readonly CheckBox _verboseChk = new() { Text = "Diagnóstico verbose (loggea cada keystroke)", AutoSize = true };
+    private readonly CheckBox _verboseChk = new() { Text = "Diagnóstico verbose (loggea cada SPACE)", AutoSize = true };
     private readonly Button _openLogs = new() { Text = "Abrir carpeta de logs", Width = 200 };
     private readonly Button _save = new() { Text = "Guardar", Width = 100 };
     private readonly Button _cancel = new() { Text = "Cancelar", Width = 100 };
@@ -29,7 +26,7 @@ internal sealed class SettingsForm : Form
         _configPath = configPath;
 
         Text = "Autolumo — Configuración";
-        Width = 560; Height = 480;
+        Width = 560; Height = 460;
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
@@ -65,26 +62,21 @@ internal sealed class SettingsForm : Form
         vidPidRow.Controls.Add(_pid);
         panel.Controls.Add(vidPidRow);
 
-        panel.Controls.Add(Header("Ventana objetivo"));
-        panel.Controls.Add(Label("Nombre de proceso (sin .exe):"));
-        panel.Controls.Add(_processName);
-        panel.Controls.Add(Label("Título contiene (opcional):"));
-        panel.Controls.Add(_windowTitleContains);
         panel.Controls.Add(new Label
         {
-            Text = "Si ambos quedan vacíos, los espacios del lector se suprimen en cualquier app.",
+            Text = "Los espacios que vengan SÓLO de este dispositivo se eliminan.\r\n" +
+                   "Los espacios del teclado humano siguen llegando intactos a cualquier app.",
             ForeColor = Color.DimGray,
             AutoSize = false,
             Width = 480,
-            Height = 32,
-            Margin = new Padding(0, 4, 0, 12)
+            Height = 40,
+            Margin = new Padding(0, 0, 0, 12)
         });
 
         panel.Controls.Add(Header("Arranque"));
         panel.Controls.Add(_autostartChk);
 
         panel.Controls.Add(Header("Diagnóstico"));
-        panel.Controls.Add(_ignoreFilterChk);
         panel.Controls.Add(_verboseChk);
         panel.Controls.Add(new Label
         {
@@ -143,10 +135,7 @@ internal sealed class SettingsForm : Form
 
         _vid.Text = savedVid;
         _pid.Text = savedPid;
-        _processName.Text = _initial.TargetProcessName;
-        _windowTitleContains.Text = _initial.TargetWindowTitleContains;
         _autostartChk.Checked = _autostart.IsEnabled();
-        _ignoreFilterChk.Checked = _initial.IgnoreWindowFilter;
         _verboseChk.Checked = _initial.VerboseLogging;
     }
 
@@ -170,10 +159,7 @@ internal sealed class SettingsForm : Form
             var config = new ScannerConfig(
                 VendorId: _vid.Text.Trim(),
                 ProductId: _pid.Text.Trim(),
-                TargetProcessName: _processName.Text.Trim(),
-                TargetWindowTitleContains: _windowTitleContains.Text.Trim(),
                 AutostartEnabled: _autostartChk.Checked,
-                IgnoreWindowFilter: _ignoreFilterChk.Checked,
                 VerboseLogging: _verboseChk.Checked);
 
             ConfigIo.Save(_configPath, config);
@@ -184,9 +170,7 @@ internal sealed class SettingsForm : Form
             else _autostart.Disable();
 
             MessageBox.Show(
-                "Configuración guardada.\n\nReinicia la aplicación para aplicar los cambios " +
-                "del dispositivo (VID/PID). El nombre de proceso y el filtro de título se aplican " +
-                "tras reiniciar también.",
+                "Configuración guardada.\n\nReinicia la aplicación para aplicar los cambios.",
                 "Autolumo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             Close();
         }

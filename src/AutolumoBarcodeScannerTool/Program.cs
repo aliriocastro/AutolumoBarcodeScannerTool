@@ -5,7 +5,6 @@ using AutolumoBarcodeScannerTool.Core;
 using AutolumoBarcodeScannerTool.Diag;
 using AutolumoBarcodeScannerTool.Hid;
 using AutolumoBarcodeScannerTool.Tray;
-using AutolumoBarcodeScannerTool.Win32;
 
 namespace AutolumoBarcodeScannerTool;
 
@@ -16,7 +15,6 @@ internal static class Program
     {
         ApplicationConfiguration.Initialize();
 
-        // Single-instance guard scoped to the current user session.
         using var mutex = new Mutex(initiallyOwned: true,
             name: @"Local\AutolumoBarcodeScannerTool_v1", out var firstInstance);
         if (!firstInstance)
@@ -27,14 +25,12 @@ internal static class Program
             return;
         }
 
-        // Config + logs live under %LOCALAPPDATA%\AutolumoBarcodeScannerTool\.
         var localData = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "AutolumoBarcodeScannerTool");
-        var configDir = localData;
         var logDir = Path.Combine(localData, "logs");
-        Directory.CreateDirectory(configDir);
-        var configPath = Path.Combine(configDir, "appsettings.ini");
+        Directory.CreateDirectory(localData);
+        var configPath = Path.Combine(localData, "appsettings.ini");
         if (!File.Exists(configPath))
         {
             var seedPath = Path.Combine(AppContext.BaseDirectory, "appsettings.default.ini");
@@ -43,19 +39,20 @@ internal static class Program
 
         var config = ConfigIo.Load(configPath);
         AppLog.Init(logDir, config.VerboseLogging);
-        AppLog.Info($"=== arranque v0.2.1 — VID={config.VendorId} PID={config.ProductId} " +
-                    $"proc='{config.TargetProcessName}' title='{config.TargetWindowTitleContains}' " +
-                    $"ignoreFilter={config.IgnoreWindowFilter} verbose={config.VerboseLogging} ===");
+        AppLog.Info($"=== arranque v0.2.2 — VID={config.VendorId} PID={config.ProductId} " +
+                    $"verbose={config.VerboseLogging} ===");
 
         var autostart = new AutostartManager();
 
-        // Tracker registers a hidden Raw Input window for the configured VID/PID.
-        // The window MUST be created on the STA Main thread that owns Application.Run().
+        // Tracker registra un hidden window para Raw Input de TODOS los teclados.
+        // Cuando llega un SPACE, identifica el origen y re-inyecta si proviene
+        // del teclado humano (el LL hook suprime preventivamente todo SPACE no
+        // marcado con el sentinel).
         using var tracker = new ScannerKeyTracker(config.VendorId, config.ProductId);
         try
         {
             tracker.Start();
-            AppLog.Info($"ScannerKeyTracker.Start OK — escuchando VID_{config.VendorId}&PID_{config.ProductId}");
+            AppLog.Info($"ScannerKeyTracker.Start OK — filtrando VID_{config.VendorId}&PID_{config.ProductId}");
         }
         catch (Exception ex)
         {
@@ -66,29 +63,14 @@ internal static class Program
                 "Autolumo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
-        // LL hook callback. Si IgnoreWindowFilter está activo, pasamos strings
-        // vacíos como filtro: SpaceSuppressor ya trata "ambos vacíos" como
-        // "suprime en cualquier app" (semántica probada).
-        //
-        // ForegroundWindow.GetCurrent es method group — SpaceSuppressor sólo
-        // lo invoca tras pasar los guards baratos, así no hay syscall por
-        // cada keystroke del sistema.
-        var procFilter = config.IgnoreWindowFilter ? "" : config.TargetProcessName;
-        var titleFilter = config.IgnoreWindowFilter ? "" : config.TargetWindowTitleContains;
-        using var hook = new LowLevelKeyboardHook(vk =>
+        // LL hook: suprime preventivamente cualquier VK_SPACE no marcado por
+        // nosotros (sentinel). El WndProc del tracker es quien decide después
+        // si re-inyectarlo (era humano) o dejarlo bloqueado (era del lector).
+        using var hook = new LowLevelKeyboardHook((vk, dwExtraInfo) =>
         {
-            var decision = SpaceSuppressor.ShouldSuppress(
-                vk,
-                DateTime.UtcNow,
-                tracker.LastScannerKeyTime,
-                ForegroundWindow.GetCurrent,
-                procFilter,
-                titleFilter);
+            var decision = SpaceSuppressor.ShouldSuppress(vk, dwExtraInfo);
             if (vk == 0x20)
-            {
-                var sinceScanner = (DateTime.UtcNow - tracker.LastScannerKeyTime).TotalMilliseconds;
-                AppLog.Debug($"LL hook VK=SPACE sinceScannerMs={sinceScanner:F0} decision={(decision ? "SUPPRESS" : "PASS")}");
-            }
+                AppLog.Debug($"LL hook VK=SPACE dwExtraInfo=0x{dwExtraInfo.ToInt64():X} decision={(decision ? "SUPPRESS" : "PASS")}");
             return decision;
         });
         hook.Install();
