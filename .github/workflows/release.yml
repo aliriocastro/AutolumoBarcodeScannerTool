@@ -46,17 +46,32 @@ jobs:
             -r win-x64 `
             --self-contained `
             -p:PublishSingleFile=true `
-            -p:Version=$env:VERSION
+            -p:Version=$env:VERSION `
+            -o publish/selfcontained
 
-      - name: Package as zip
+      - name: Publish framework-dependent (requires .NET Desktop Runtime in target machine)
         env:
           VERSION: ${{ steps.version.outputs.version }}
         shell: pwsh
         run: |
-          $publish = "src/AutolumoBarcodeScannerTool/bin/Release/net10.0-windows/win-x64/publish"
-          $zip = "AutolumoBarcodeScannerTool-$env:VERSION-win-x64.zip"
-          Compress-Archive -Path "$publish/*" -DestinationPath $zip -Force
-          Write-Host "Created $zip"
+          dotnet publish src/AutolumoBarcodeScannerTool/AutolumoBarcodeScannerTool.csproj `
+            -c Release `
+            -r win-x64 `
+            -p:SelfContained=false `
+            -p:PublishSingleFile=true `
+            -p:Version=$env:VERSION `
+            -o publish/fxdependent
+
+      - name: Package both as zip
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: pwsh
+        run: |
+          $sc  = "AutolumoBarcodeScannerTool-$env:VERSION-win-x64.zip"
+          $fxd = "AutolumoBarcodeScannerTool-$env:VERSION-win-x64-fxdep.zip"
+          Compress-Archive -Path "publish/selfcontained/*" -DestinationPath $sc  -Force
+          Compress-Archive -Path "publish/fxdependent/*"   -DestinationPath $fxd -Force
+          Write-Host "Created $sc and $fxd"
 
       - name: Create GitHub Release
         env:
@@ -65,8 +80,10 @@ jobs:
         shell: bash
         run: |
           SHORT_SHA="${GITHUB_SHA_FULL:0:7}"
-          ZIP="AutolumoBarcodeScannerTool-${VERSION}-win-x64.zip"
+          ZIP_SC="AutolumoBarcodeScannerTool-${VERSION}-win-x64.zip"
+          ZIP_FXD="AutolumoBarcodeScannerTool-${VERSION}-win-x64-fxdep.zip"
+          NOTES=$'Build automatico desde tag `'"${TAG_NAME}"$'` (commit `'"${SHORT_SHA}"$'`).\n\n**Dos artifacts:**\n- `'"${ZIP_SC}"$'` (self-contained, ~110 MB): no requiere instalar nada en la PC destino.\n- `'"${ZIP_FXD}"$'` (framework-dependent, ~5 MB): requiere .NET 10 Desktop Runtime x64 ya instalado en la PC destino.\n\nVer `docs/installation-and-validation.md` para instrucciones de cada caso.'
           gh release create "$TAG_NAME" \
             --title "AutolumoBarcodeScannerTool v${VERSION}" \
-            --notes "Build automático desde tag \`${TAG_NAME}\` (commit \`${SHORT_SHA}\`). Binario Windows x64 self-contained." \
-            "$ZIP"
+            --notes "$NOTES" \
+            "$ZIP_SC" "$ZIP_FXD"

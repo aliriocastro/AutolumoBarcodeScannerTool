@@ -52,11 +52,31 @@ jobs:
             -r win-x64 `
             --self-contained `
             -p:PublishSingleFile=true `
-            -p:Version=$env:VERSION
-      - name: Upload artifact
+            -p:Version=$env:VERSION `
+            -o publish/selfcontained
+      - name: Publish framework-dependent
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: pwsh
+        run: |
+          dotnet publish src/AutolumoBarcodeScannerTool/AutolumoBarcodeScannerTool.csproj `
+            -c Release `
+            -r win-x64 `
+            -p:SelfContained=false `
+            -p:PublishSingleFile=true `
+            -p:Version=$env:VERSION `
+            -o publish/fxdependent
+      - name: Upload self-contained artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AutolumoBarcodeScannerTool-${{ steps.version.outputs.version }}
-          path: src/AutolumoBarcodeScannerTool/bin/Release/net10.0-windows/win-x64/publish/
+          name: AutolumoBarcodeScannerTool-${{ steps.version.outputs.version }}-selfcontained
+          path: publish/selfcontained/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Upload framework-dependent artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutolumoBarcodeScannerTool-${{ steps.version.outputs.version }}-fxdependent
+          path: publish/fxdependent/
           retention-days: 14
           if-no-files-found: error

@@ -24,10 +24,46 @@ best-effort (ver README sección "Modos de operación").
 
 ## 1. Descarga e instalación
 
-### 1a. Descargar el release
+### 1a. Elegir el artifact correcto
 
-Ve a https://github.com/aliriocastro/AutolumoBarcodeScannerTool/releases/tag/v0.1.1
-y descarga `AutolumoBarcodeScannerTool-0.1.1-win-x64.zip`.
+Ve a https://github.com/aliriocastro/AutolumoBarcodeScannerTool/releases/tag/v0.1.2
+y descarga **uno** de los dos zips disponibles:
+
+| Artifact | Tamaño | Cuándo usar | Requisitos en la PC destino |
+|---|---|---|---|
+| `AutolumoBarcodeScannerTool-0.1.2-win-x64.zip` | ~47 MB | Default. No quieres preocuparte por instalar runtime. | Ninguno (todo embebido). |
+| `AutolumoBarcodeScannerTool-0.1.2-win-x64-fxdep.zip` | ~880 KB | Tienes muchas PCs y quieres una app pequeña, o la PC ya tiene el runtime. | **.NET 10 Desktop Runtime x64** instalado. |
+
+Si dudas, usa el self-contained.
+
+#### Caso A — self-contained (sin runtime)
+
+No hace falta hacer nada antes; salta directamente a "1b. Extraer".
+
+#### Caso B — framework-dependent (requiere runtime)
+
+Primero verifica si la PC destino ya tiene el runtime correcto:
+
+```cmd
+dotnet --list-runtimes
+```
+
+Busca una línea que diga `Microsoft.WindowsDesktop.App 10.x.y` (la version
+patch `y` no importa, pero la major.minor sí: debe ser `10.0` o superior
+dentro del rango compatible). Si NO aparece, instálalo:
+
+1. Ve a https://dotnet.microsoft.com/en-us/download/dotnet/10.0
+2. Sección "Run desktop apps" → **.NET Desktop Runtime** → "Windows x64"
+   (archivo tipo `windowsdesktop-runtime-10.0.x-win-x64.exe`, ~50 MB).
+   ⚠ NO descargues el SDK ni el ASP.NET Core Runtime — necesitas
+   específicamente el **Desktop Runtime** porque la app usa WinForms.
+3. Doble click en el instalador. Acepta. (Requiere admin la primera vez,
+   pero queda instalado para todos los usuarios.)
+4. Verifica de nuevo con `dotnet --list-runtimes`.
+
+Si tu organización tiene política de no descargar instaladores de
+internet, descarga el `windowsdesktop-runtime-*.exe` desde tu equipo y
+cópialo por la red interna; es un MSI estándar de Microsoft.
 
 ### 1b. Extraer
 
@@ -39,7 +75,8 @@ C:\Program Files\Autolumo\BarcodeScannerTool\
 sobre `Program Files`).
 
 Extrae el contenido del zip ahí. Debes ver:
-- `AutolumoBarcodeScannerTool.exe` (~112 MB)
+- `AutolumoBarcodeScannerTool.exe` (~112 MB self-contained, o ~2 MB
+  framework-dependent)
 - `appsettings.default.ini`
 - 2 archivos `.pdb` (debug symbols — se pueden borrar para ahorrar espacio,
   pero ayudan al diagnóstico si hay crash)
@@ -274,9 +311,15 @@ Solo aplica si activaste autostart en Settings.
    - Si hay `[FTL] Fallo fatal en arranque` con stack trace → reportar.
    - Si no hay log nada, el crash es antes de Serilog. Ver Event Viewer.
 
-2. **Otra instancia ya está corriendo**. Ver Test 10. Mira Task Manager.
+2. **Falta runtime (solo aplica al artifact framework-dependent)**. Al
+   ejecutar el .exe verás un diálogo "To run this application, you must
+   install .NET. Would you like to download it?" — instala el .NET 10
+   Desktop Runtime x64 (ver caso B en sección 1a). El self-contained
+   NO tiene este problema.
 
-3. **Antivirus bloquea silenciosamente**. Verifica logs de tu AV.
+3. **Otra instancia ya está corriendo**. Ver Test 10. Mira Task Manager.
+
+4. **Antivirus bloquea silenciosamente**. Verifica logs de tu AV.
 
 ### Síntoma: escaneo no llega al destino (Serial mode)
 
