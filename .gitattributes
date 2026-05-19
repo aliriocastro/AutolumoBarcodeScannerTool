@@ -1,0 +1,13 @@
+# Forzar LF en todos los archivos de texto para evitar diferencias
+# entre checkouts Windows/macOS/Linux. Crítico para los tests de
+# IniConfigWriter que comparan raw string literals con la salida.
+* text=auto eol=lf
+
+# Binarios no se tocan
+*.exe binary
+*.dll binary
+*.pdb binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.zip binary
