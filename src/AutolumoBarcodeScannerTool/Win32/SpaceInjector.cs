@@ -14,14 +14,17 @@ internal static class SpaceInjector
     private const uint INPUT_KEYBOARD = 1;
     private const uint KEYEVENTF_KEYUP = 0x0002;
 
-    public static void SendSpace()
+    // Devuelve el número de inputs efectivamente encolados por Windows
+    // (esperado: 2 — un down + un up). Si devuelve 0, GetLastError revela
+    // la causa (típicamente tamaño de struct incorrecto o input bloqueado).
+    public static uint SendSpace()
     {
         var inputs = new[]
         {
             MakeKey(KEYEVENTF_KEYUP: 0),
             MakeKey(KEYEVENTF_KEYUP: KEYEVENTF_KEYUP)
         };
-        _ = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
     }
 
     private static INPUT MakeKey(uint KEYEVENTF_KEYUP) => new()

@@ -39,7 +39,7 @@ internal static class Program
 
         var config = ConfigIo.Load(configPath);
         AppLog.Init(logDir, config.VerboseLogging);
-        AppLog.Info($"=== arranque v0.2.2 — VID={config.VendorId} PID={config.ProductId} " +
+        AppLog.Info($"=== arranque v0.2.3 — VID={config.VendorId} PID={config.ProductId} " +
                     $"verbose={config.VerboseLogging} ===");
 
         var autostart = new AutostartManager();

@@ -81,7 +81,22 @@ internal sealed class ScannerKeyTracker : NativeWindow, IDisposable
             // suprimidos por el LL hook, fluyen normalmente al foreground.
             if (input.Keyboard.VKey != VK_SPACE) return;
 
+            // Eventos sintéticos de SendInput tienen DeviceHandle = 0 y no
+            // resuelven device name. Si no los filtramos aquí, nuestra propia
+            // re-inyección dispara WM_INPUT → "no es scanner" → re-inyectamos
+            // de nuevo → loop infinito hasta que Windows tira el hook.
+            if (input.Header.DeviceHandle == IntPtr.Zero)
+            {
+                AppLog.Debug("WM_INPUT VK=SPACE synthetic (hDevice=0) — skipping");
+                return;
+            }
             var deviceName = GetDeviceName(input.Header.DeviceHandle) ?? "";
+            if (string.IsNullOrEmpty(deviceName))
+            {
+                AppLog.Debug("WM_INPUT VK=SPACE empty device name — skipping (likely synthetic)");
+                return;
+            }
+
             var fromScanner = deviceName.Contains(_scannerDeviceFragment, StringComparison.OrdinalIgnoreCase);
             AppLog.Debug($"WM_INPUT VK=SPACE device='{deviceName}' fromScanner={fromScanner} action={(fromScanner ? "DROP" : "REINJECT")}");
 
@@ -94,7 +109,8 @@ internal sealed class ScannerKeyTracker : NativeWindow, IDisposable
 
             // Era un SPACE del teclado humano. El LL hook lo bloqueó
             // preventivamente; lo restauramos vía SendInput con sentinel.
-            SpaceInjector.SendSpace();
+            var sent = SpaceInjector.SendSpace();
+            AppLog.Debug($"SpaceInjector.SendSpace → sent={sent} (esperado 2)");
         }
         finally
         {
