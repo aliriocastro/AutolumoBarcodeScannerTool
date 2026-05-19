@@ -25,7 +25,6 @@ jobs:
         id: version
         shell: bash
         run: |
-          # Strip leading "v" from tag (v0.1.0 -> 0.1.0)
           VERSION="${TAG_NAME#v}"
           if [[ -z "$VERSION" ]]; then
             echo "Tag name is empty after stripping 'v' prefix" >&2
@@ -36,20 +35,9 @@ jobs:
       - name: Run tests
         run: dotnet test tests/AutolumoBarcodeScannerTool.Tests/AutolumoBarcodeScannerTool.Tests.csproj -c Release --verbosity normal
 
-      - name: Publish single-file self-contained
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        shell: pwsh
-        run: |
-          dotnet publish src/AutolumoBarcodeScannerTool/AutolumoBarcodeScannerTool.csproj `
-            -c Release `
-            -r win-x64 `
-            --self-contained `
-            -p:PublishSingleFile=true `
-            -p:Version=$env:VERSION `
-            -o publish/selfcontained
-
-      - name: Publish framework-dependent (requires .NET Desktop Runtime in target machine)
+      # -p:SelfContained=false is the MSBuild property override; the CLI flag
+      # --self-contained false does NOT override the csproj <SelfContained>true</>.
+      - name: Publish single-file framework-dependent
         env:
           VERSION: ${{ steps.version.outputs.version }}
         shell: pwsh
@@ -60,18 +48,16 @@ jobs:
             -p:SelfContained=false `
             -p:PublishSingleFile=true `
             -p:Version=$env:VERSION `
-            -o publish/fxdependent
+            -o publish/fxdep
 
-      - name: Package both as zip
+      - name: Package zip
         env:
           VERSION: ${{ steps.version.outputs.version }}
         shell: pwsh
         run: |
-          $sc  = "AutolumoBarcodeScannerTool-$env:VERSION-win-x64.zip"
-          $fxd = "AutolumoBarcodeScannerTool-$env:VERSION-win-x64-fxdep.zip"
-          Compress-Archive -Path "publish/selfcontained/*" -DestinationPath $sc  -Force
-          Compress-Archive -Path "publish/fxdependent/*"   -DestinationPath $fxd -Force
-          Write-Host "Created $sc and $fxd"
+          $zip = "AutolumoBarcodeScannerTool-$env:VERSION-win-x64-fxdep.zip"
+          Compress-Archive -Path "publish/fxdep/*" -DestinationPath $zip -Force
+          Write-Host "Created $zip"
 
       - name: Create GitHub Release
         env:
@@ -80,10 +66,9 @@ jobs:
         shell: bash
         run: |
           SHORT_SHA="${GITHUB_SHA_FULL:0:7}"
-          ZIP_SC="AutolumoBarcodeScannerTool-${VERSION}-win-x64.zip"
-          ZIP_FXD="AutolumoBarcodeScannerTool-${VERSION}-win-x64-fxdep.zip"
-          NOTES=$'Build automatico desde tag `'"${TAG_NAME}"$'` (commit `'"${SHORT_SHA}"$'`).\n\n**Dos artifacts:**\n- `'"${ZIP_SC}"$'` (self-contained, ~110 MB): no requiere instalar nada en la PC destino.\n- `'"${ZIP_FXD}"$'` (framework-dependent, ~5 MB): requiere .NET 10 Desktop Runtime x64 ya instalado en la PC destino.\n\nVer `docs/installation-and-validation.md` para instrucciones de cada caso.'
+          ZIP="AutolumoBarcodeScannerTool-${VERSION}-win-x64-fxdep.zip"
+          NOTES=$'Build automatico desde tag `'"${TAG_NAME}"$'` (commit `'"${SHORT_SHA}"$'`).\n\n**Requiere .NET 10 Desktop Runtime x64 instalado en la PC destino:**\nhttps://dotnet.microsoft.com/download/dotnet/10.0/runtime (elegir "Desktop Runtime").\n\n## Instalacion\n\n1. Descarga `'"${ZIP}"$'` (~5 MB).\n2. Extrae en una carpeta persistente (ej. `C:\\Tools\\Autolumo`).\n3. Ejecuta `AutolumoBarcodeScannerTool.exe`.\n4. Click derecho en el icono de bandeja > Configurar...\n5. Selecciona tu lector HID, opcionalmente filtra por ventana objetivo.\n6. Reinicia la app.\n\nEl bloqueo de espacios del lector queda activo automaticamente cuando la ventana configurada esta al frente.'
           gh release create "$TAG_NAME" \
             --title "AutolumoBarcodeScannerTool v${VERSION}" \
             --notes "$NOTES" \
-            "$ZIP_SC" "$ZIP_FXD"
+            "$ZIP"
