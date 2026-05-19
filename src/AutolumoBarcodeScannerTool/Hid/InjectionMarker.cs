@@ -15,5 +15,9 @@ namespace AutolumoBarcodeScannerTool.Hid;
 // va a colisionar.
 internal static class InjectionMarker
 {
-    public static readonly IntPtr Sentinel = (IntPtr)0xA1700C0DL;
+    // new IntPtr(long) takes the value verbatim on 64-bit (lo only on 32-bit,
+    // which we don't ship — RuntimeIdentifier is win-x64). Using a plain
+    // `(IntPtr)0xA1700C0DL` cast trips a "may overflow nint at runtime"
+    // compile-time warning that the CI treats as error.
+    public static readonly IntPtr Sentinel = new IntPtr(0xA1700C0DL);
 }
