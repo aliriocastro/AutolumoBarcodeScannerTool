@@ -95,8 +95,10 @@ public class ForegroundProcessSinkTests
     [Fact]
     public async Task ConcurrentSend_SecondCallIsDiscarded()
     {
-        // Deterministic synchronization: block the FIRST injector call until
-        // we manually release it. This avoids timing-based flakiness in CI.
+        // The sink is fully synchronous (SendInput is a fast Win32 syscall, no
+        // Task.Run wrapper). To exercise the concurrency guard we run FIRST on
+        // a background thread that blocks inside the injector, then call SECOND
+        // from the test thread while FIRST still holds the semaphore.
         var (sut, window, injector) = Build("MiAppContable");
         window.Current = new ForegroundWindowInfo("MiAppContable", "x");
 
@@ -105,15 +107,17 @@ public class ForegroundProcessSinkTests
         injector.OnSendingText = _ => firstEnteredInjector.TrySetResult();
         injector.BlockUntilSignaled = releaseFirst;
 
-        // Kick off FIRST. It will acquire the semaphore synchronously, then
-        // hand off to Task.Run where it'll block inside the injector.
-        var first = sut.SendAsync(Event("FIRST\t"), CancellationToken.None);
+        // Kick off FIRST on a background thread. It will acquire the semaphore
+        // and block inside the injector waiting for releaseFirst.
+        var first = Task.Run(async () =>
+            await sut.SendAsync(Event("FIRST\t"), CancellationToken.None));
 
-        // Wait deterministically for FIRST to actually enter the injector,
+        // Wait deterministically until FIRST is actually inside the injector,
         // proving the semaphore is held.
         await firstEnteredInjector.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        // SECOND should fail to acquire the semaphore and return immediately.
+        // SECOND on the test thread: should fail to acquire the semaphore and
+        // return immediately without sending anything.
         await sut.SendAsync(Event("SECOND\t"), CancellationToken.None);
 
         // Release FIRST and let it finish.

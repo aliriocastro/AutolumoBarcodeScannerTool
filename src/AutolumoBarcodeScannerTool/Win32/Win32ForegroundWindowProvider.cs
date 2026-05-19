@@ -21,7 +21,11 @@ internal sealed class Win32ForegroundWindowProvider : IForegroundWindowProvider
             using var proc = Process.GetProcessById((int)pid);
             processName = proc.ProcessName;
         }
-        catch (ArgumentException)
+        catch (Exception ex) when (
+            ex is ArgumentException ||                              // process not found / exited
+            ex is System.ComponentModel.Win32Exception ||           // access denied (elevated process)
+            ex is InvalidOperationException ||                      // process state issue
+            ex is NotSupportedException)                            // remote / unsupported
         {
             return null;
         }

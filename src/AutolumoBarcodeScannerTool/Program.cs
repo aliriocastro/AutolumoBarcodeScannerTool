@@ -50,21 +50,55 @@ internal static class Program
                 outputTemplate: "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
 
+        // Single-instance guard, scoped to the current user session. Prevents
+        // multiple tray icons and double LL hooks when autostart already brought
+        // one up at login and the user double-clicks the .exe again. We use
+        // "Local\\" (the default session namespace) instead of "Global\\" because
+        // the latter requires SeCreateGlobalPrivilege which standard users lack.
+        using var singleInstance = new System.Threading.Mutex(
+            initiallyOwned: true,
+            name: @"Local\AutolumoBarcodeScannerTool_v1",
+            out var isFirstInstance);
+        if (!isFirstInstance)
+        {
+            MessageBox.Show(
+                "Autolumo Barcode Scanner Tool ya está en ejecución. Revisa el ícono en la bandeja del sistema.",
+                "Autolumo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
         try
         {
             using var host = BuildHost(configPath, args);
             host.Start();
 
+            // CRITICAL: start the orchestrator on the STA Main thread (not via
+            // IHostedService which can run on the threadpool). The HID source
+            // creates a NativeWindow and installs a WH_KEYBOARD_LL hook — both
+            // require the calling thread to own the message pump that
+            // Application.Run() is about to start.
+            var orchestrator = host.Services.GetRequiredService<ScannerOrchestrator>();
+            var scannerOpts = host.Services.GetRequiredService<IOptionsMonitor<ScannerOptions>>().CurrentValue;
+
+            // Honor Enabled flag from config. If false, leave the orchestrator
+            // stopped — the user can resume from the tray menu.
+            if (scannerOpts.Enabled)
+                orchestrator.StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+
             var tray = host.Services.GetRequiredService<TrayIconController>();
-            tray.Show();
+            tray.Show(startEnabled: scannerOpts.Enabled);
 
-            Application.Run();
+            Application.Run(new ApplicationContext());
 
+            orchestrator.StopAsync(CancellationToken.None).GetAwaiter().GetResult();
             host.StopAsync().GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
             Log.Fatal(ex, "Fallo fatal en arranque");
+            MessageBox.Show(
+                $"Error fatal: {ex.Message}\n\nRevisa los logs en %LOCALAPPDATA%\\AutolumoBarcodeScannerTool\\logs",
+                "Autolumo", MessageBoxButtons.OK, MessageBoxIcon.Error);
             throw;
         }
         finally
@@ -110,7 +144,6 @@ internal static class Program
 
                 services.AddSingleton<ScannerOrchestrator>();
                 services.AddSingleton<TrayIconController>();
-                services.AddHostedService<OrchestratorHostedService>();
             })
             .Build();
 
@@ -135,10 +168,3 @@ internal static class Program
             opts.Terminator, lf.CreateLogger<HidKeyboardInputSource>());
 }
 
-internal sealed class OrchestratorHostedService : IHostedService
-{
-    private readonly ScannerOrchestrator _orchestrator;
-    public OrchestratorHostedService(ScannerOrchestrator orchestrator) { _orchestrator = orchestrator; }
-    public Task StartAsync(CancellationToken ct) => _orchestrator.StartAsync(ct);
-    public Task StopAsync(CancellationToken ct) => _orchestrator.StopAsync(ct);
-}

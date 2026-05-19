@@ -81,7 +81,19 @@ internal sealed class SettingsForm : Form
         ));
 
         var hid = new TabPage("HID");
+        var hidWarning = new Label
+        {
+            Text = "⚠ Modo HID-keyboard: la supresión del input crudo del lector es " +
+                   "best-effort (heurística de timing). Para garantía total, configure " +
+                   "su lector en modo Serial/USB-CDC mediante el código de barras de " +
+                   "configuración de fábrica (consulte el manual del lector).",
+            AutoSize = false,
+            Width = 480,
+            Height = 80,
+            ForeColor = Color.DarkRed
+        };
         hid.Controls.Add(Stack(8,
+            hidWarning,
             Label("Dispositivo detectado:"), _hidDevice,
             Label("VID (hex):"), _vid,
             Label("PID (hex):"), _pid
@@ -172,10 +184,19 @@ internal sealed class SettingsForm : Form
             contents = IniConfigWriter.Update(contents, "Scanner:Output:OutputSuffix", _outputSuffix.Text);
             File.WriteAllText(_configPath, contents);
 
-            if (_autostartChk.Checked) _autostart.Enable(Application.ExecutablePath);
+            // Environment.ProcessPath returns the launcher .exe even for single-file
+            // self-contained publishes. Application.ExecutablePath in that scenario
+            // returns the extraction temp folder which doesn't survive reboots.
+            var exePath = Environment.ProcessPath
+                ?? throw new InvalidOperationException("No se pudo determinar la ruta del ejecutable.");
+            if (_autostartChk.Checked) _autostart.Enable(exePath);
             else _autostart.Disable();
 
-            MessageBox.Show("Configuración guardada. Los cambios se aplican automáticamente.",
+            MessageBox.Show(
+                "Configuración guardada.\n\n" +
+                "• Proceso destino y título: se aplican inmediatamente.\n" +
+                "• Tipo de fuente, puerto COM, VID/PID HID, encoding, terminador y baud rate: " +
+                "requieren reiniciar la aplicación.",
                 "Autolumo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             Close();
         }

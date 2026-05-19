@@ -35,10 +35,11 @@ internal sealed class TrayIconController : IDisposable
         _logger = logger;
     }
 
-    public void Show()
+    public void Show(bool startEnabled = true)
     {
+        _enabled = startEnabled;
         _icon.Text = "Autolumo Barcode Scanner Tool";
-        _icon.Icon = LoadIcon("tray-active.ico");
+        _icon.Icon = LoadIcon(_enabled ? "tray-active.ico" : "tray-paused.ico");
         BuildMenu();
         _icon.ContextMenuStrip = _menu;
         _icon.Visible = true;
@@ -68,19 +69,29 @@ internal sealed class TrayIconController : IDisposable
 
     private async Task ToggleAsync()
     {
-        if (_enabled)
+        try
         {
-            await _orchestrator.StopAsync(CancellationToken.None);
-            _icon.Icon = LoadIcon("tray-paused.ico");
-            _enabled = false;
+            if (_enabled)
+            {
+                await _orchestrator.StopAsync(CancellationToken.None);
+                _icon.Icon = LoadIcon("tray-paused.ico");
+                _enabled = false;
+            }
+            else
+            {
+                await _orchestrator.StartAsync(CancellationToken.None);
+                _icon.Icon = LoadIcon("tray-active.ico");
+                _enabled = true;
+            }
+            BuildMenu();
         }
-        else
+        catch (Exception ex)
         {
-            await _orchestrator.StartAsync(CancellationToken.None);
-            _icon.Icon = LoadIcon("tray-active.ico");
-            _enabled = true;
+            _logger.LogError(ex, "Error en pausa/reanudar");
+            _icon.Icon = LoadIcon("tray-error.ico");
+            MessageBox.Show($"Error al cambiar estado: {ex.Message}",
+                "Autolumo", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        BuildMenu();
     }
 
     private void OpenSettings()
