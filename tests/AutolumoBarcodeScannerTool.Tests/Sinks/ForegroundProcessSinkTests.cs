@@ -95,16 +95,30 @@ public class ForegroundProcessSinkTests
     [Fact]
     public async Task ConcurrentSend_SecondCallIsDiscarded()
     {
+        // Deterministic synchronization: block the FIRST injector call until
+        // we manually release it. This avoids timing-based flakiness in CI.
         var (sut, window, injector) = Build("MiAppContable");
         window.Current = new ForegroundWindowInfo("MiAppContable", "x");
-        injector.SimulatedDelay = TimeSpan.FromMilliseconds(200);
 
+        var firstEnteredInjector = new TaskCompletionSource();
+        using var releaseFirst = new ManualResetEventSlim(initialState: false);
+        injector.OnSendingText = _ => firstEnteredInjector.TrySetResult();
+        injector.BlockUntilSignaled = releaseFirst;
+
+        // Kick off FIRST. It will acquire the semaphore synchronously, then
+        // hand off to Task.Run where it'll block inside the injector.
         var first = sut.SendAsync(Event("FIRST\t"), CancellationToken.None);
-        // Asegurar que el primero haya entrado al semaforo
-        await Task.Delay(50);
-        var second = sut.SendAsync(Event("SECOND\t"), CancellationToken.None);
 
-        await Task.WhenAll(first, second);
+        // Wait deterministically for FIRST to actually enter the injector,
+        // proving the semaphore is held.
+        await firstEnteredInjector.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // SECOND should fail to acquire the semaphore and return immediately.
+        await sut.SendAsync(Event("SECOND\t"), CancellationToken.None);
+
+        // Release FIRST and let it finish.
+        releaseFirst.Set();
+        await first;
 
         injector.SentTexts.ShouldBe(new[] { "FIRST\t" });
     }
