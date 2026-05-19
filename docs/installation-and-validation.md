@@ -1,4 +1,4 @@
-# Manual de instalación y validación — Autolumo Barcode Scanner Tool v0.1.1
+# Manual de instalación y validación — Autolumo Barcode Scanner Tool v0.1.2
 
 Este documento te guía paso a paso desde un Windows limpio hasta confirmar
 que la app funciona contra tu hardware y tu app destino. Síguelo en orden;
@@ -117,17 +117,17 @@ Click derecho en el ícono de bandeja → **Configuración...**
   de la ventana. Útil si tu app destino tiene varias ventanas y solo
   quieres inyectar en la de "Factura nueva". Dejar vacío para no filtrar.
 
-### 2f. Pestaña "Salida"
+### 2f. Salida (comportamiento fijo)
 
-- **Modo al terminador**:
-  - `Tab` — payload + TAB (lo más común para navegar al siguiente campo)
-  - `TabEnter` — payload + TAB + ENTER (si la app también necesita Enter
-    para confirmar)
-  - `TabOnly` — payload sin sufijo (raro)
-  - `Custom` — usa el sufijo del campo siguiente
+A partir de v0.1.2 la transformación es **hardcodeada** y NO se configura:
 
-- **Sufijo (Custom)**: solo aplica si `Custom`. Tokens: `{TAB}`, `{ENTER}`.
-  Ejemplo: `{TAB}END{ENTER}` envía payload + TAB + literal "END" + ENTER.
+- El **primer espacio** del payload se elimina (ej. `LAB 2026-001` →
+  `LAB2026-001`).
+- Al final del payload se envía **ENTER** (`\n`, traducido a VK_RETURN
+  por el inyector).
+
+Pestaña "Salida" eliminada en la UI. Si tu app destino esperaba TAB en
+lugar de ENTER, abre un issue.
 
 ### 2g. Guardar
 
@@ -137,7 +137,6 @@ hot-reload y cuáles requieren reinicio.
 **Cambios hot-reload (toman efecto inmediatamente):**
 - Proceso destino
 - Contiene en título
-- Modo de salida y sufijo
 
 **Cambios que requieren reinicio (cierra app y vuelve a abrir):**
 - Tipo de fuente (Serial ↔ HidKeyboard)
@@ -172,14 +171,15 @@ que debe pasar). Marca cada uno.
 
 - [ ] Paso 1: abre tu app destino. Pon el cursor en el campo donde
   esperas que llegue el código (ej. campo "código de producto").
-- [ ] Paso 2: escanea un código de prueba conocido (ej. un código que
-  tengas a mano).
+- [ ] Paso 2: escanea un código de prueba conocido que **incluya un
+  espacio** (formato real: `PREFIJO CONTENIDO`).
 - Esperado:
-  - El payload aparece en el campo
-  - Termina con un TAB (cursor se mueve al siguiente campo) o lo que
-    hayas configurado en "Modo al terminador"
-  - NO ves CRLF / saltos de línea / contenido borrado
-  - Si tu app destino antes "se borraba" con CRLF, ahora NO se borra
+  - El payload aparece en el campo SIN el primer espacio (ej. si
+    escaneas `LAB 2026-001` debe aparecer `LAB2026-001`).
+  - El cursor confirma con ENTER al final (avance de fila / submit
+    según la app destino).
+  - NO ves doble salto de línea, ni el espacio del barcode, ni
+    contenido borrado.
 
 ### Test 4 — Caracteres especiales en barcode (CRÍTICO para lab/medical)
 
@@ -342,7 +342,7 @@ debería reconectar.
 - Cambios al **proceso destino** y **título** se aplican inmediatamente
   (hot-reload via `IOptionsMonitor`).
 - TODOS los demás (SourceType, port name, baud, VID/PID, terminator,
-  encoding, output mode/suffix) requieren reiniciar la app.
+  encoding) requieren reiniciar la app.
 
 Cierra desde tray (Salir) y vuelve a abrir.
 
@@ -417,8 +417,9 @@ acumula hasta CRLF                 acumula hasta CR (con
        ScannerOrchestrator.HandleScanAsync
                   │
                   ▼
-       ReplaceTerminatorTransform aplica sufijo
-       (Tab / TabEnter / TabOnly / Custom)
+       ReplaceTerminatorTransform:
+       - elimina el primer espacio del payload
+       - appende '\n' (→ VK_RETURN en el inyector)
                   │
                   ▼
        ForegroundProcessSink:

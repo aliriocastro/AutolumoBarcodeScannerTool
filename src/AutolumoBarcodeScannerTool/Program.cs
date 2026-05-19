@@ -119,7 +119,6 @@ internal static class Program
             {
                 services.Configure<ScannerOptions>(ctx.Configuration.GetSection(ScannerOptions.SectionName));
                 services.Configure<TargetOptions>(ctx.Configuration.GetSection($"{ScannerOptions.SectionName}:Target"));
-                services.Configure<OutputOptions>(ctx.Configuration.GetSection($"{ScannerOptions.SectionName}:Output"));
                 services.Configure<AutostartOptions>(ctx.Configuration.GetSection(AutostartOptions.SectionName));
                 services.Configure<LoggingOptions>(ctx.Configuration.GetSection(LoggingOptions.SectionName));
 

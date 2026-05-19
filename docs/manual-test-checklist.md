@@ -36,7 +36,7 @@ Marcar cada caso con la fecha y el responsable.
 
 ## Hot-reload
 
-- [ ] Editar `appsettings.ini` y cambiar `Scanner:Output:OnTerminator` de `Tab` a `TabEnter` → próximo escaneo agrega `TAB+ENTER` sin reiniciar app
+- [ ] Editar `appsettings.ini` y cambiar `Scanner:Target:ProcessName` → próximo escaneo respeta el nuevo target sin reiniciar app
 
 ## Antivirus
 

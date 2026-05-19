@@ -14,14 +14,6 @@ public enum ScanTerminator
     Any
 }
 
-public enum OutputMode
-{
-    Tab,
-    TabEnter,
-    TabOnly,
-    Custom
-}
-
 public enum SourceConnectionState
 {
     Disconnected,

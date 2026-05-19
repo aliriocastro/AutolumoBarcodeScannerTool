@@ -10,7 +10,6 @@ public sealed class ScannerOptions
     public SerialOptions Serial { get; set; } = new();
     public HidKeyboardOptions HidKeyboard { get; set; } = new();
     public TargetOptions Target { get; set; } = new();
-    public OutputOptions Output { get; set; } = new();
 }
 
 public sealed class SerialOptions
@@ -33,12 +32,6 @@ public sealed class TargetOptions
 {
     public string ProcessName { get; set; } = "";
     public string? WindowTitleContains { get; set; }
-}
-
-public sealed class OutputOptions
-{
-    public OutputMode OnTerminator { get; set; } = OutputMode.Tab;
-    public string OutputSuffix { get; set; } = "{TAB}";
 }
 
 public sealed class AutostartOptions

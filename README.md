@@ -1,6 +1,10 @@
 # Autolumo Barcode Scanner Tool
 
-App Windows que intercepta el input de un lector de código de barras (Serial COM o HID-keyboard) y reemplaza el terminador `CRLF` por `TAB` (configurable) antes de inyectarlo en una app destino filtrada por proceso.
+App Windows que intercepta el input de un lector de código de barras (Serial COM o HID-keyboard), **elimina el primer espacio** del payload y envía **ENTER** al final, antes de inyectarlo en una app destino filtrada por proceso.
+
+Ejemplo: el lector escanea `LAB 2026-001\r\n` → la app destino recibe `LAB2026-001<ENTER>`.
+
+El comportamiento de la salida es fijo (no configurable). Solo el modo de captura (Serial / HID), el puerto y el filtro de proceso destino se configuran.
 
 ## Requisitos
 

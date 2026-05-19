@@ -32,9 +32,6 @@ internal sealed class SettingsForm : Form
     private readonly TextBox _processName = new();
     private readonly TextBox _windowTitleContains = new();
 
-    private readonly ComboBox _outputMode = new() { DropDownStyle = ComboBoxStyle.DropDownList };
-    private readonly TextBox _outputSuffix = new();
-
     private readonly Button _save = new() { Text = "Guardar", Width = 100 };
     private readonly Button _cancel = new() { Text = "Cancelar", Width = 100 };
 
@@ -109,19 +106,22 @@ internal sealed class SettingsForm : Form
             _hidDevice.Items.Add(d);
 
         var target = new TabPage("Destino");
+        var outputInfo = new Label
+        {
+            Text = "Salida: el primer espacio del código se elimina y al final se " +
+                   "envía ENTER. Comportamiento fijo (no configurable).",
+            AutoSize = false,
+            Width = 480,
+            Height = 40,
+            ForeColor = Color.DimGray
+        };
         target.Controls.Add(Stack(8,
             Label("Nombre de proceso (sin .exe):"), _processName,
-            Label("Contiene en título (opcional):"), _windowTitleContains
+            Label("Contiene en título (opcional):"), _windowTitleContains,
+            outputInfo
         ));
 
-        var output = new TabPage("Salida");
-        _outputMode.Items.AddRange(new object[] { "Tab", "TabEnter", "TabOnly", "Custom" });
-        output.Controls.Add(Stack(8,
-            Label("Modo al terminador:"), _outputMode,
-            Label("Sufijo (Custom; tokens {TAB} {ENTER}):"), _outputSuffix
-        ));
-
-        _tabs.TabPages.AddRange(new[] { general, serial, hid, target, output });
+        _tabs.TabPages.AddRange(new[] { general, serial, hid, target });
         Controls.Add(_tabs);
     }
 
@@ -158,9 +158,6 @@ internal sealed class SettingsForm : Form
 
         _processName.Text = _opts.Target.ProcessName;
         _windowTitleContains.Text = _opts.Target.WindowTitleContains ?? "";
-
-        _outputMode.SelectedItem = _opts.Output.OnTerminator.ToString();
-        _outputSuffix.Text = _opts.Output.OutputSuffix;
     }
 
     private void Save()
@@ -180,8 +177,6 @@ internal sealed class SettingsForm : Form
             contents = IniConfigWriter.Update(contents, "Scanner:HidKeyboard:ProductId", _pid.Text);
             contents = IniConfigWriter.Update(contents, "Scanner:Target:ProcessName", _processName.Text);
             contents = IniConfigWriter.Update(contents, "Scanner:Target:WindowTitleContains", _windowTitleContains.Text);
-            contents = IniConfigWriter.Update(contents, "Scanner:Output:OnTerminator", _outputMode.SelectedItem?.ToString() ?? "Tab");
-            contents = IniConfigWriter.Update(contents, "Scanner:Output:OutputSuffix", _outputSuffix.Text);
             File.WriteAllText(_configPath, contents);
 
             // Environment.ProcessPath returns the launcher .exe even for single-file
