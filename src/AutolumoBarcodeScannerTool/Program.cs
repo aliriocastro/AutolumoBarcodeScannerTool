@@ -5,6 +5,7 @@ using AutolumoBarcodeScannerTool.Core;
 using AutolumoBarcodeScannerTool.Diag;
 using AutolumoBarcodeScannerTool.Hid;
 using AutolumoBarcodeScannerTool.Tray;
+using AutolumoBarcodeScannerTool.Win32;
 
 namespace AutolumoBarcodeScannerTool;
 
@@ -39,42 +40,43 @@ internal static class Program
 
         var config = ConfigIo.Load(configPath);
         AppLog.Init(logDir, config.VerboseLogging);
-        AppLog.Info($"=== arranque v0.2.4 — VID={config.VendorId} PID={config.ProductId} " +
+        AppLog.Info($"=== arranque v0.2.5 — VID={config.VendorId} PID={config.ProductId} " +
                     $"verbose={config.VerboseLogging} ===");
 
         var autostart = new AutostartManager();
 
-        // Tracker registra un hidden window para Raw Input de TODOS los teclados.
-        // Cuando llega un SPACE, identifica el origen y re-inyecta si proviene
-        // del teclado humano (el LL hook suprime preventivamente todo SPACE no
-        // marcado con el sentinel).
-        using var tracker = new ScannerKeyTracker(config.VendorId, config.ProductId);
-        try
+        // SpaceArbiter: tras suprimir un SPACE, espera 25 ms. Si llega otra
+        // tecla en ese intervalo → era un burst (lector) → SPACE queda bloqueado.
+        // Si pasan 25 ms sin actividad → era SPACE humano → restaurar via
+        // SendInput con sentinel. El LL hook ya nos reconoce vía LLKHF_INJECTED.
+        var arbiter = new SpaceArbiter(restoreSpace: () =>
         {
-            tracker.Start();
-            AppLog.Info($"ScannerKeyTracker.Start OK — filtrando VID_{config.VendorId}&PID_{config.ProductId}");
-        }
-        catch (Exception ex)
-        {
-            AppLog.Info($"ScannerKeyTracker.Start FAILED: {ex.Message}");
-            MessageBox.Show(
-                $"No se pudo registrar el lector HID (VID={config.VendorId}, PID={config.ProductId}):\n\n{ex.Message}\n\n" +
-                "Abre Configurar… desde la bandeja para seleccionar otro dispositivo.",
-                "Autolumo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
+            var sent = SpaceInjector.SendSpace();
+            AppLog.Debug($"Arbiter: restaurando SPACE humano (SendInput sent={sent})");
+        }, delayMs: 25);
 
-        // LL hook: suprime preventivamente cualquier VK_SPACE no marcado por
-        // nosotros (sentinel). El WndProc del tracker es quien decide después
-        // si re-inyectarlo (era humano) o dejarlo bloqueado (era del lector).
         using var hook = new LowLevelKeyboardHook((vk, flags, dwExtraInfo) =>
         {
-            var decision = SpaceSuppressor.ShouldSuppress(vk, flags, dwExtraInfo);
+            var suppress = SpaceSuppressor.ShouldSuppress(vk, flags, dwExtraInfo);
+
             if (vk == 0x20)
-                AppLog.Debug($"LL hook VK=SPACE flags=0x{flags:X} dwExtraInfo=0x{dwExtraInfo.ToInt64():X} decision={(decision ? "SUPPRESS" : "PASS")}");
-            return decision;
+            {
+                AppLog.Debug($"LL hook VK=SPACE flags=0x{flags:X} dwExtraInfo=0x{dwExtraInfo.ToInt64():X} decision={(suppress ? "SUPPRESS" : "PASS")}");
+                if (suppress) arbiter.OnSpaceSuppressed();
+                // Si !suppress es nuestra propia re-inyección con sentinel —
+                // no notificamos al arbiter para evitar bucle.
+            }
+            else
+            {
+                // Cualquier otra tecla cancela una restauración pendiente:
+                // el SPACE anterior era parte de un burst del lector.
+                arbiter.OnNonSpaceKey();
+            }
+
+            return suppress;
         });
         hook.Install();
-        AppLog.Info("LowLevelKeyboardHook installed");
+        AppLog.Info("LowLevelKeyboardHook installed (timing-based arbiter, delay=25ms)");
 
         using var tray = new TrayController(() =>
         {
