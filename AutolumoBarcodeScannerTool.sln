@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutolumoBarcodeScannerTool.
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutolumoBarcodeScannerTool", "src\AutolumoBarcodeScannerTool\AutolumoBarcodeScannerTool.csproj", "{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,11 +47,24 @@ Global
 		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Release|x64.Build.0 = Release|Any CPU
 		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Release|x86.ActiveCfg = Release|Any CPU
 		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Release|x86.Build.0 = Release|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Debug|x64.Build.0 = Debug|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Debug|x86.Build.0 = Debug|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Release|x64.ActiveCfg = Release|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Release|x64.Build.0 = Release|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Release|x86.ActiveCfg = Release|Any CPU
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{FF152010-AC43-4521-B5B8-DD821E3DD8F0} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{7374DC5F-2021-4E6D-9DA8-47C87B0F52F5} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
