@@ -25,4 +25,15 @@
     <ProjectReference Include="..\..\src\AutolumoBarcodeScannerTool.Core\AutolumoBarcodeScannerTool.Core.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <Compile Remove="Configuration/**" />
+    <Compile Remove="Models/**" />
+    <Compile Remove="Orchestration/**" />
+    <Compile Remove="Sinks/**" />
+    <Compile Remove="Sources/**" />
+    <Compile Remove="Transforms/**" />
+    <Compile Remove="Fakes/**" />
+  </ItemGroup>
+
 </Project>
