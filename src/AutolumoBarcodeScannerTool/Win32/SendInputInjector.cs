@@ -31,8 +31,8 @@ internal sealed class SendInputInjector : IInputInjector
 
     private static void AppendVirtualKey(List<INPUT> list, ushort vk)
     {
-        list.Add(MakeKey(vk, 0, 0));
-        list.Add(MakeKey(vk, 0, KEYEVENTF_KEYUP));
+        list.Add(MakeKey(vk, '\0', 0));
+        list.Add(MakeKey(vk, '\0', KEYEVENTF_KEYUP));
     }
 
     private static void AppendUnicode(List<INPUT> list, char ch)
