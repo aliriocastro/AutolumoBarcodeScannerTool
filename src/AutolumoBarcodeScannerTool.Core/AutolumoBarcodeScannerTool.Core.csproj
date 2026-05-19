@@ -6,14 +6,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-
-  <ItemGroup>
-    <Compile Remove="Models/**" />
-    <Compile Remove="Transforms/**" />
-    <Compile Remove="Orchestration/**" />
-    <Compile Remove="Sinks/**" />
-    <Compile Remove="Sources/**" />
-    <Compile Remove="Configuration/**" />
-  </ItemGroup>
-
 </Project>
