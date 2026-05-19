@@ -10,10 +10,18 @@ namespace AutolumoBarcodeScannerTool.Tests.Sinks;
 
 public class ForegroundProcessSinkTests
 {
+    private sealed class StaticMonitor<T> : IOptionsMonitor<T>
+    {
+        public StaticMonitor(T value) { CurrentValue = value; }
+        public T CurrentValue { get; }
+        public T Get(string? name) => CurrentValue;
+        public IDisposable? OnChange(Action<T, string?> listener) => null;
+    }
+
     private static (ForegroundProcessSink Sut, FakeForegroundWindowProvider Window, FakeInputInjector Injector)
         Build(string targetProcess, string? titleContains = null)
     {
-        var opts = Options.Create(new TargetOptions
+        var opts = new StaticMonitor<TargetOptions>(new TargetOptions
         {
             ProcessName = targetProcess,
             WindowTitleContains = titleContains
