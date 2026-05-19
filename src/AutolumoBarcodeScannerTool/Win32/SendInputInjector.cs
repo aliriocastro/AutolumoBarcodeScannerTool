@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using AutolumoBarcodeScannerTool.Core.Sinks;
+using AutolumoBarcodeScannerTool.Hid;
 
 namespace AutolumoBarcodeScannerTool.Win32;
 
@@ -52,7 +53,11 @@ internal sealed class SendInputInjector : IInputInjector
                 wScan = (ushort)scan,
                 dwFlags = flags,
                 time = 0,
-                dwExtraInfo = IntPtr.Zero
+                // Sentinel for the WH_KEYBOARD_LL hook in HID mode — without it
+                // our own keystrokes get suppressed by the source's burst
+                // heuristic, since SendInput happens right after the scanner
+                // burst within the "recent scanner activity" window.
+                dwExtraInfo = InjectionMarker.Sentinel
             }
         }
     };

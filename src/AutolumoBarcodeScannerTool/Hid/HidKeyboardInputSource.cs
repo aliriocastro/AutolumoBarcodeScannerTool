@@ -165,8 +165,16 @@ internal sealed class HidKeyboardInputSource : NativeWindow, IInputSource
     private const int BurstMinimumKeys = 2;
     private const int ScannerActivityWindowMs = 300; // any scanner key in window → in-burst
 
-    private bool ShouldSuppress(int vkCode)
+    private bool ShouldSuppress(int vkCode, IntPtr dwExtraInfo)
     {
+        // Never suppress our own SendInput keystrokes — the injector marks
+        // every KEYBDINPUT with InjectionMarker.Sentinel in dwExtraInfo. The
+        // OS propagates that to the LL hook. Without this guard our own
+        // output is eaten by the burst heuristic because it lands inside
+        // the "recent scanner activity" window we set 6 lines down.
+        if (dwExtraInfo == InjectionMarker.Sentinel)
+            return false;
+
         var now = DateTime.UtcNow;
         var matchCutoff = now.AddMilliseconds(-50);
         var activityCutoff = now.AddMilliseconds(-ScannerActivityWindowMs);
