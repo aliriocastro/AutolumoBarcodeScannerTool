@@ -1,19 +1,55 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31919.166
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AutolumoBarcodeScannerTool.Core", "src\AutolumoBarcodeScannerTool.Core\AutolumoBarcodeScannerTool.Core.csproj", "{00000001-0000-0000-0000-000000000001}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutolumoBarcodeScannerTool.Tests", "tests\AutolumoBarcodeScannerTool.Tests\AutolumoBarcodeScannerTool.Tests.csproj", "{FF152010-AC43-4521-B5B8-DD821E3DD8F0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{00000001-0000-0000-0000-000000000001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{00000001-0000-0000-0000-000000000001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{00000001-0000-0000-0000-000000000001}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{00000001-0000-0000-0000-000000000001}.Debug|x64.Build.0 = Debug|Any CPU
+		{00000001-0000-0000-0000-000000000001}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{00000001-0000-0000-0000-000000000001}.Debug|x86.Build.0 = Debug|Any CPU
 		{00000001-0000-0000-0000-000000000001}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{00000001-0000-0000-0000-000000000001}.Release|Any CPU.Build.0 = Release|Any CPU
+		{00000001-0000-0000-0000-000000000001}.Release|x64.ActiveCfg = Release|Any CPU
+		{00000001-0000-0000-0000-000000000001}.Release|x64.Build.0 = Release|Any CPU
+		{00000001-0000-0000-0000-000000000001}.Release|x86.ActiveCfg = Release|Any CPU
+		{00000001-0000-0000-0000-000000000001}.Release|x86.Build.0 = Release|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Debug|x64.Build.0 = Debug|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Debug|x86.Build.0 = Debug|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Release|x64.ActiveCfg = Release|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Release|x64.Build.0 = Release|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Release|x86.ActiveCfg = Release|Any CPU
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FF152010-AC43-4521-B5B8-DD821E3DD8F0} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
