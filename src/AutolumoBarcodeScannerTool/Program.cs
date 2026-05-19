@@ -2,6 +2,7 @@ using System.IO;
 using System.Threading;
 using AutolumoBarcodeScannerTool.Autostart;
 using AutolumoBarcodeScannerTool.Core;
+using AutolumoBarcodeScannerTool.Diag;
 using AutolumoBarcodeScannerTool.Hid;
 using AutolumoBarcodeScannerTool.Tray;
 using AutolumoBarcodeScannerTool.Win32;
@@ -26,11 +27,12 @@ internal static class Program
             return;
         }
 
-        // Config lives in %LOCALAPPDATA%\AutolumoBarcodeScannerTool\appsettings.ini.
-        // On first run we seed it from appsettings.default.ini next to the exe.
-        var configDir = Path.Combine(
+        // Config + logs live under %LOCALAPPDATA%\AutolumoBarcodeScannerTool\.
+        var localData = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "AutolumoBarcodeScannerTool");
+        var configDir = localData;
+        var logDir = Path.Combine(localData, "logs");
         Directory.CreateDirectory(configDir);
         var configPath = Path.Combine(configDir, "appsettings.ini");
         if (!File.Exists(configPath))
@@ -40,6 +42,11 @@ internal static class Program
         }
 
         var config = ConfigIo.Load(configPath);
+        AppLog.Init(logDir, config.VerboseLogging);
+        AppLog.Info($"=== arranque v0.2.1 — VID={config.VendorId} PID={config.ProductId} " +
+                    $"proc='{config.TargetProcessName}' title='{config.TargetWindowTitleContains}' " +
+                    $"ignoreFilter={config.IgnoreWindowFilter} verbose={config.VerboseLogging} ===");
+
         var autostart = new AutostartManager();
 
         // Tracker registers a hidden Raw Input window for the configured VID/PID.
@@ -48,28 +55,44 @@ internal static class Program
         try
         {
             tracker.Start();
+            AppLog.Info($"ScannerKeyTracker.Start OK — escuchando VID_{config.VendorId}&PID_{config.ProductId}");
         }
         catch (Exception ex)
         {
+            AppLog.Info($"ScannerKeyTracker.Start FAILED: {ex.Message}");
             MessageBox.Show(
                 $"No se pudo registrar el lector HID (VID={config.VendorId}, PID={config.ProductId}):\n\n{ex.Message}\n\n" +
                 "Abre Configurar… desde la bandeja para seleccionar otro dispositivo.",
                 "Autolumo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            // We continue running — user can fix config from the tray.
         }
 
-        // LL hook callback: combine tracker timestamp + foreground window check.
-        // ForegroundWindow.GetCurrent is passed as a method group — SpaceSuppressor
-        // only invokes it after the cheap vk/time guards pass, so non-space
-        // keystrokes never trigger the Win32 + Process.GetProcessById syscall.
-        using var hook = new LowLevelKeyboardHook(vk => SpaceSuppressor.ShouldSuppress(
-            vk,
-            DateTime.UtcNow,
-            tracker.LastScannerKeyTime,
-            ForegroundWindow.GetCurrent,
-            config.TargetProcessName,
-            config.TargetWindowTitleContains));
+        // LL hook callback. Si IgnoreWindowFilter está activo, pasamos strings
+        // vacíos como filtro: SpaceSuppressor ya trata "ambos vacíos" como
+        // "suprime en cualquier app" (semántica probada).
+        //
+        // ForegroundWindow.GetCurrent es method group — SpaceSuppressor sólo
+        // lo invoca tras pasar los guards baratos, así no hay syscall por
+        // cada keystroke del sistema.
+        var procFilter = config.IgnoreWindowFilter ? "" : config.TargetProcessName;
+        var titleFilter = config.IgnoreWindowFilter ? "" : config.TargetWindowTitleContains;
+        using var hook = new LowLevelKeyboardHook(vk =>
+        {
+            var decision = SpaceSuppressor.ShouldSuppress(
+                vk,
+                DateTime.UtcNow,
+                tracker.LastScannerKeyTime,
+                ForegroundWindow.GetCurrent,
+                procFilter,
+                titleFilter);
+            if (vk == 0x20)
+            {
+                var sinceScanner = (DateTime.UtcNow - tracker.LastScannerKeyTime).TotalMilliseconds;
+                AppLog.Debug($"LL hook VK=SPACE sinceScannerMs={sinceScanner:F0} decision={(decision ? "SUPPRESS" : "PASS")}");
+            }
+            return decision;
+        });
         hook.Install();
+        AppLog.Info("LowLevelKeyboardHook installed");
 
         using var tray = new TrayController(() =>
         {
@@ -78,5 +101,6 @@ internal static class Program
         });
 
         Application.Run(new ApplicationContext());
+        AppLog.Info("=== shutdown ===");
     }
 }

@@ -31,7 +31,9 @@ public class ConfigIoTests
                 ProductId: "0x0B61",
                 TargetProcessName: "MiAppContable",
                 TargetWindowTitleContains: "Factura",
-                AutostartEnabled: false);
+                AutostartEnabled: false,
+                IgnoreWindowFilter: true,
+                VerboseLogging: true);
 
             ConfigIo.Save(path, original);
             var loaded = ConfigIo.Load(path);
@@ -109,8 +111,8 @@ public class ConfigIoTests
         var path = TempPath();
         try
         {
-            ConfigIo.Save(path, new ScannerConfig("0x1111", "0x2222", "AppA", "", true));
-            ConfigIo.Save(path, new ScannerConfig("0x3333", "0x4444", "AppB", "filter", false));
+            ConfigIo.Save(path, new ScannerConfig("0x1111", "0x2222", "AppA", "", true, false, false));
+            ConfigIo.Save(path, new ScannerConfig("0x3333", "0x4444", "AppB", "filter", false, false, false));
 
             var loaded = ConfigIo.Load(path);
 

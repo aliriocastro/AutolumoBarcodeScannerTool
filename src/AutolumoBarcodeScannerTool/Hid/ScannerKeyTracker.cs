@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using AutolumoBarcodeScannerTool.Diag;
 using static AutolumoBarcodeScannerTool.Hid.RawInputInterop;
 
 namespace AutolumoBarcodeScannerTool.Hid;
@@ -67,7 +68,9 @@ internal sealed class ScannerKeyTracker : NativeWindow, IDisposable
             if ((input.Keyboard.Flags & RI_KEY_BREAK) != 0) return;
 
             var deviceName = GetDeviceName(input.Header.DeviceHandle) ?? "";
-            if (!deviceName.Contains(_scannerDeviceFragment, StringComparison.OrdinalIgnoreCase)) return;
+            var matches = deviceName.Contains(_scannerDeviceFragment, StringComparison.OrdinalIgnoreCase);
+            AppLog.Debug($"WM_INPUT vk=0x{input.Keyboard.VKey:X2} device='{deviceName}' matchesConfigured={matches}");
+            if (!matches) return;
 
             LastScannerKeyTime = DateTime.UtcNow;
         }

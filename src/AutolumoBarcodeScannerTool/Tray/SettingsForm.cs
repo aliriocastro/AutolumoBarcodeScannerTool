@@ -16,6 +16,9 @@ internal sealed class SettingsForm : Form
     private readonly TextBox _processName = new() { Width = 480 };
     private readonly TextBox _windowTitleContains = new() { Width = 480 };
     private readonly CheckBox _autostartChk = new() { Text = "Iniciar con Windows", AutoSize = true };
+    private readonly CheckBox _ignoreFilterChk = new() { Text = "Ignorar filtro de ventana (modo prueba — suprime en cualquier app)", AutoSize = true };
+    private readonly CheckBox _verboseChk = new() { Text = "Diagnóstico verbose (loggea cada keystroke)", AutoSize = true };
+    private readonly Button _openLogs = new() { Text = "Abrir carpeta de logs", Width = 200 };
     private readonly Button _save = new() { Text = "Guardar", Width = 100 };
     private readonly Button _cancel = new() { Text = "Cancelar", Width = 100 };
 
@@ -80,6 +83,21 @@ internal sealed class SettingsForm : Form
         panel.Controls.Add(Header("Arranque"));
         panel.Controls.Add(_autostartChk);
 
+        panel.Controls.Add(Header("Diagnóstico"));
+        panel.Controls.Add(_ignoreFilterChk);
+        panel.Controls.Add(_verboseChk);
+        panel.Controls.Add(new Label
+        {
+            Text = "Logs en %LOCALAPPDATA%\\AutolumoBarcodeScannerTool\\logs\\app-AAAAMMDD.log",
+            ForeColor = Color.DimGray,
+            AutoSize = false,
+            Width = 480,
+            Height = 18,
+            Margin = new Padding(0, 4, 0, 4)
+        });
+        _openLogs.Click += (_, _) => OpenLogsFolder();
+        panel.Controls.Add(_openLogs);
+
         Controls.Add(panel);
 
         var bar = new FlowLayoutPanel
@@ -128,6 +146,21 @@ internal sealed class SettingsForm : Form
         _processName.Text = _initial.TargetProcessName;
         _windowTitleContains.Text = _initial.TargetWindowTitleContains;
         _autostartChk.Checked = _autostart.IsEnabled();
+        _ignoreFilterChk.Checked = _initial.IgnoreWindowFilter;
+        _verboseChk.Checked = _initial.VerboseLogging;
+    }
+
+    private static void OpenLogsFolder()
+    {
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "AutolumoBarcodeScannerTool", "logs");
+        Directory.CreateDirectory(dir);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = dir,
+            UseShellExecute = true
+        });
     }
 
     private void Save()
@@ -139,7 +172,9 @@ internal sealed class SettingsForm : Form
                 ProductId: _pid.Text.Trim(),
                 TargetProcessName: _processName.Text.Trim(),
                 TargetWindowTitleContains: _windowTitleContains.Text.Trim(),
-                AutostartEnabled: _autostartChk.Checked);
+                AutostartEnabled: _autostartChk.Checked,
+                IgnoreWindowFilter: _ignoreFilterChk.Checked,
+                VerboseLogging: _verboseChk.Checked);
 
             ConfigIo.Save(_configPath, config);
 

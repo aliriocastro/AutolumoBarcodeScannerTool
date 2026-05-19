@@ -7,6 +7,8 @@ public static class ConfigIo
     private const string KeyProcess = "TargetProcessName";
     private const string KeyTitle = "TargetWindowTitleContains";
     private const string KeyAutostart = "AutostartEnabled";
+    private const string KeyIgnoreWindow = "IgnoreWindowFilter";
+    private const string KeyVerbose = "VerboseLogging";
 
     public static ScannerConfig Load(string path)
     {
@@ -20,7 +22,7 @@ public static class ConfigIo
             var line = rawLine.TrimStart();
             if (line.Length == 0) continue;
             if (line.StartsWith(';') || line.StartsWith('#')) continue;
-            if (line.StartsWith('[') && line.EndsWith(']')) continue; // section header — ignored
+            if (line.StartsWith('[') && line.EndsWith(']')) continue;
 
             var eq = line.IndexOf('=');
             if (eq < 0) continue;
@@ -36,14 +38,17 @@ public static class ConfigIo
             ProductId = values.TryGetValue(KeyProduct, out var p) ? p : d.ProductId,
             TargetProcessName = values.TryGetValue(KeyProcess, out var pr) ? pr : d.TargetProcessName,
             TargetWindowTitleContains = values.TryGetValue(KeyTitle, out var t) ? t : d.TargetWindowTitleContains,
-            // Malformed bool values (e.g. "yes", "1") fall back to default rather
-            // than silently mapping to false — a hand-edited file shouldn't flip
-            // a default-true setting to false without saying so.
-            AutostartEnabled = values.TryGetValue(KeyAutostart, out var a) && bool.TryParse(a, out var ab)
-                ? ab
-                : d.AutostartEnabled
+            AutostartEnabled = ParseBoolOrDefault(values, KeyAutostart, d.AutostartEnabled),
+            IgnoreWindowFilter = ParseBoolOrDefault(values, KeyIgnoreWindow, d.IgnoreWindowFilter),
+            VerboseLogging = ParseBoolOrDefault(values, KeyVerbose, d.VerboseLogging)
         };
     }
+
+    // Malformed bool values (e.g. "yes", "1") fall back to default rather than
+    // silently mapping to false — a hand-edited file shouldn't flip a default-true
+    // setting to false without saying so.
+    private static bool ParseBoolOrDefault(Dictionary<string, string> values, string key, bool dflt) =>
+        values.TryGetValue(key, out var a) && bool.TryParse(a, out var ab) ? ab : dflt;
 
     public static void Save(string path, ScannerConfig config)
     {
@@ -56,7 +61,9 @@ public static class ConfigIo
             $"{KeyProduct}={config.ProductId}",
             $"{KeyProcess}={config.TargetProcessName}",
             $"{KeyTitle}={config.TargetWindowTitleContains}",
-            $"{KeyAutostart}={(config.AutostartEnabled ? "true" : "false")}"
+            $"{KeyAutostart}={(config.AutostartEnabled ? "true" : "false")}",
+            $"{KeyIgnoreWindow}={(config.IgnoreWindowFilter ? "true" : "false")}",
+            $"{KeyVerbose}={(config.VerboseLogging ? "true" : "false")}"
         };
         File.WriteAllLines(path, lines);
     }
